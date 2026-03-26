@@ -1,0 +1,292 @@
+{
+	"meta": {
+		"fuente_casos": "INEN — Listado de Pacientes Nuevos Enero 2022-Noviembre 2025",
+		"fuente_poblacion": "INEI — Estimaciones y Proyecciones Departamentales 2000-2026",
+		"fecha_corte": "2025-11-29",
+		"año_parcial": 2025,
+		"nota_2025": "Datos solo hasta noviembre 2025, no comparar directamente con años completos",
+		"total_casos_ayacucho": 1687,
+		"departamento": "AYACUCHO"
+	},
+	"por_año": {
+		"2022": {
+			"casos": 417,
+			"poblacion": 670579,
+			"tasa_por_100k": 62.19,
+			"completo": true
+		},
+		"2023": {
+			"casos": 435,
+			"poblacion": 670377,
+			"tasa_por_100k": 64.89,
+			"completo": true
+		},
+		"2024": {
+			"casos": 433,
+			"poblacion": 669737,
+			"tasa_por_100k": 64.65,
+			"completo": true
+		},
+		"2025": {
+			"casos": 402,
+			"poblacion": 669020,
+			"tasa_por_100k": 60.09,
+			"completo": false
+		}
+	},
+	"por_mes": {
+		"2022": {
+			"1": 38,
+			"2": 31,
+			"3": 45,
+			"4": 32,
+			"5": 36,
+			"6": 33,
+			"7": 28,
+			"8": 32,
+			"9": 59,
+			"10": 37,
+			"11": 22,
+			"12": 24
+		},
+		"2023": {
+			"1": 37,
+			"2": 34,
+			"3": 38,
+			"4": 31,
+			"5": 33,
+			"6": 36,
+			"7": 39,
+			"8": 40,
+			"9": 35,
+			"10": 51,
+			"11": 32,
+			"12": 29
+		},
+		"2024": {
+			"1": 40,
+			"2": 33,
+			"3": 40,
+			"4": 46,
+			"5": 33,
+			"6": 30,
+			"7": 33,
+			"8": 29,
+			"9": 38,
+			"10": 47,
+			"11": 40,
+			"12": 24
+		},
+		"2025": {
+			"1": 42,
+			"2": 24,
+			"3": 30,
+			"4": 37,
+			"5": 35,
+			"6": 40,
+			"7": 27,
+			"8": 34,
+			"9": 38,
+			"10": 50,
+			"11": 45
+		}
+	},
+	"por_sexo": {
+		"2022": {
+			"FEMENINO": 261,
+			"MASCULINO": 156
+		},
+		"2023": {
+			"FEMENINO": 276,
+			"MASCULINO": 159
+		},
+		"2024": {
+			"FEMENINO": 279,
+			"MASCULINO": 154
+		},
+		"2025": {
+			"FEMENINO": 265,
+			"MASCULINO": 137
+		},
+		"total": {
+			"FEMENINO": 1081,
+			"MASCULINO": 606
+		}
+	},
+	"por_grupo_etario": {
+		"2022": {
+			"31-40": 51,
+			"71-80": 70,
+			"0-20": 27,
+			"81+": 29,
+			"41-50": 56,
+			"61-70": 86,
+			"21-30": 30,
+			"51-60": 68
+		},
+		"2023": {
+			"51-60": 91,
+			"71-80": 76,
+			"61-70": 76,
+			"21-30": 28,
+			"81+": 38,
+			"31-40": 35,
+			"0-20": 36,
+			"41-50": 55
+		},
+		"2024": {
+			"71-80": 76,
+			"0-20": 41,
+			"61-70": 87,
+			"51-60": 84,
+			"81+": 40,
+			"21-30": 24,
+			"31-40": 34,
+			"41-50": 47
+		},
+		"2025": {
+			"61-70": 72,
+			"41-50": 51,
+			"71-80": 92,
+			"31-40": 42,
+			"51-60": 78,
+			"81+": 29,
+			"21-30": 13,
+			"0-20": 25
+		},
+		"grupos": [
+			"0-20",
+			"21-30",
+			"31-40",
+			"41-50",
+			"51-60",
+			"61-70",
+			"71-80",
+			"81+"
+		],
+		"total": {
+			"31-40": 162,
+			"71-80": 314,
+			"0-20": 129,
+			"81+": 136,
+			"41-50": 209,
+			"61-70": 321,
+			"51-60": 321,
+			"21-30": 95
+		}
+	},
+	"por_provincia": {
+		"2022": {
+			"PARINACOCHAS": 13,
+			"PAUCAR DEL SARA": 16,
+			"HUAMANGA": 172,
+			"CANGALLO": 24,
+			"HUANTA": 51,
+			"LA MAR": 51,
+			"LUCANAS": 27,
+			"VILCA HUAMAN": 22,
+			"SUCRE": 14,
+			"HUANCA SANCOS": 7,
+			"VICTOR FAJARDO": 20
+		},
+		"2023": {
+			"VICTOR FAJARDO": 24,
+			"HUAMANGA": 193,
+			"PAUCAR DEL SARA": 6,
+			"LA MAR": 35,
+			"VILCA HUAMAN": 10,
+			"SUCRE": 13,
+			"PARINACOCHAS": 21,
+			"HUANTA": 58,
+			"CANGALLO": 25,
+			"LUCANAS": 45,
+			"HUANCA SANCOS": 5
+		},
+		"2024": {
+			"HUANTA": 52,
+			"PARINACOCHAS": 28,
+			"HUAMANGA": 175,
+			"SUCRE": 15,
+			"LUCANAS": 44,
+			"CANGALLO": 25,
+			"VILCA HUAMAN": 17,
+			"LA MAR": 38,
+			"VICTOR FAJARDO": 20,
+			"PAUCAR DEL SARA": 14,
+			"HUANCA SANCOS": 5
+		},
+		"2025": {
+			"HUAMANGA": 177,
+			"HUANTA": 46,
+			"PARINACOCHAS": 18,
+			"CANGALLO": 25,
+			"LUCANAS": 38,
+			"PAUCAR DEL SARA": 6,
+			"LA MAR": 39,
+			"SUCRE": 9,
+			"VILCA HUAMAN": 15,
+			"VICTOR FAJARDO": 20,
+			"HUANCA SANCOS": 9
+		},
+		"total": {
+			"PARINACOCHAS": 80,
+			"PAUCAR DEL SARA": 42,
+			"HUAMANGA": 717,
+			"CANGALLO": 99,
+			"HUANTA": 207,
+			"LA MAR": 163,
+			"LUCANAS": 154,
+			"VILCA HUAMAN": 64,
+			"SUCRE": 51,
+			"VICTOR FAJARDO": 84,
+			"HUANCA SANCOS": 26
+		}
+	},
+	"atenciones_cex": {
+		"promedio_total": 11.54,
+		"por_año": {
+			"2022": {
+				"promedio": 14.28,
+				"mediana": 7,
+				"max": 175
+			},
+			"2023": {
+				"promedio": 14.12,
+				"mediana": 7,
+				"max": 115
+			},
+			"2024": {
+				"promedio": 11.83,
+				"mediana": 6,
+				"max": 66
+			},
+			"2025": {
+				"promedio": 5.62,
+				"mediana": 3,
+				"max": 38
+			}
+		}
+	},
+	"poblacion_inei": {
+		"2022": {
+			"total": 670579,
+			"hombres": 344027,
+			"mujeres": 326552
+		},
+		"2023": {
+			"total": 670377,
+			"hombres": 344301,
+			"mujeres": 326076
+		},
+		"2024": {
+			"total": 669737,
+			"hombres": 344337,
+			"mujeres": 325400
+		},
+		"2025": {
+			"total": 669020,
+			"hombres": 344337,
+			"mujeres": 324683
+		}
+	}
+}
