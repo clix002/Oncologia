@@ -1,1399 +1,521 @@
-// Página de arquitectura BI — estilo documental/institucional
-// Inspirada en presentación del curso EIS9A261N
+"use client";
 
 import Link from "next/link";
-import PeruMap from "@/components/PeruMap";
+import ThemeToggle from "@/components/ThemeToggle";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Database, Server, Layers, BarChart4, ArrowDown, FileSpreadsheet, HardDrive, GitBranch, Workflow } from "lucide-react";
 
-export const metadata = {
-	title: "Arquitectura BI — Ayacucho Oncología",
-	description:
-		"Documentación de la arquitectura del sistema de Business Intelligence para análisis oncológico en Ayacucho.",
-};
+const STATS = [
+  { value: "204,399", label: "Pacientes", icon: "👤" },
+  { value: "66,145", label: "Atenciones INEN", icon: "🏥" },
+  { value: "138,256", label: "Def. oncológicas", icon: "🎗️" },
+  { value: "204,401", label: "Hechos OLAP", icon: "⭐" },
+  { value: "6,986", label: "Docs clínicos", icon: "📄" },
+  { value: "15,328", label: "Nodos Neo4j", icon: "🕸️" },
+  { value: "25", label: "Departamentos", icon: "🗺️" },
+  { value: "100%", label: "Data Quality", icon: "✅" },
+];
 
-export default function ArquitecturaPage() {
-	return (
-		<div
-			style={{
-				background: "#0A0A0F",
-				minHeight: "100vh",
-				color: "#F5EDD6",
-				fontFamily: "'Raleway', 'Segoe UI', sans-serif",
-			}}
-		>
-			{/* Grain overlay */}
-			<div
-				style={{
-					position: "fixed",
-					inset: 0,
-					pointerEvents: "none",
-					zIndex: 9999,
-					opacity: 0.025,
-					backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
-				}}
-			/>
+const FUENTES = [
+  {
+    name: "INEN",
+    label: "Casos oncológicos",
+    file: "inen_pacientes_2022_2025.csv",
+    rows: "66,145",
+    period: "2022 – 2025",
+    format: "CSV (latin-1, comma)",
+    size: "9 MB",
+    columns: [
+      "UUID", "FEC_FILIACION", "SEXO", "EDAD",
+      "UBIGEO", "LUGAR_RESIDENCIA", "CANT_ATENCIONES_CEX",
+    ],
+    note: "Pacientes nuevos registrados en el Instituto Nacional de Enfermedades Neoplásicas.",
+  },
+  {
+    name: "SINADEF",
+    label: "Defunciones nacionales",
+    file: "fallecidos_sinadef.csv",
+    rows: "1,134,173",
+    period: "2017 – 2024",
+    format: "CSV (pipe-delimited)",
+    size: "366 MB",
+    columns: [
+      "SEXO", "EDAD", "DEPARTAMENTO", "PROVINCIA", "DISTRITO",
+      "AÑO", "MES", "CAUSA A–F (CIE-X)",
+    ],
+    note: "Sistema Nacional de Defunciones. Códigos CIE-10 para filtrar causas oncológicas (C00-C97).",
+  },
+  {
+    name: "INEI",
+    label: "Proyecciones poblacionales",
+    file: "inei_poblacion_departamentos.xlsx",
+    rows: "300",
+    period: "2000 – 2026",
+    format: "Excel (4 hojas/trienio)",
+    size: "52 KB",
+    columns: ["UBIGEO", "DEPARTAMENTO", "TOTAL", "HOMBRES", "MUJERES"],
+    note: "Proyecciones oficiales por departamento. Permite calcular tasas por 100k habitantes.",
+  },
+  {
+    name: "DPCAN",
+    label: "Reportes por tipo de cáncer",
+    file: "4 archivos Excel",
+    rows: "Mama · Cérvix · Colon · Próstata",
+    period: "2022 – 2025",
+    format: "Excel (.xlsx)",
+    size: "87 MB",
+    columns: ["CÁNCER DE MAMA", "CÁNCER DE CÉRVIX", "COLON-RECTO", "PRÓSTATA"],
+    note: "Observatorio DPCAN. Datos desagregados por tipo de cáncer y región.",
+  },
+  {
+    name: "ENDES",
+    label: "Encuesta Demográfica y de Salud",
+    file: "5 años × 13 módulos",
+    rows: "~38,000 hogares/año",
+    period: "2020 – 2024",
+    format: "CSV (semicolon)",
+    size: "1.2 GB",
+    columns: ["RECH0", "RECH1", "RECH4", "CSALUD", "REC91", "REC84DV"],
+    note: "Factores de riesgo, tamizaje, programas sociales. Módulos DHS estándar.",
+  },
+  {
+    name: "SIS",
+    label: "Afiliados Seguro Integral",
+    file: "9 snapshots trimestrales",
+    rows: "~540k / trimestre",
+    period: "2023 – 2025",
+    format: "CSV (comma)",
+    size: "1.2 GB",
+    columns: ["EDAD", "SEXO", "UBIGEO", "DX_OBESIDAD", "DX_HIPERTENSION", "CANT_ATENCIONES"],
+    note: "Afiliados activos del SIS. Comorbilidades y utilización de servicios.",
+  },
+];
 
-			{/* Header */}
-			<header
-				style={{
-					borderBottom: "1px solid rgba(201,150,58,0.15)",
-					padding: "28px 48px",
-					display: "flex",
-					alignItems: "center",
-					justifyContent: "space-between",
-					background:
-						"linear-gradient(to bottom, rgba(10,10,15,0.98), rgba(10,10,15,0.85))",
-					position: "sticky",
-					top: 0,
-					zIndex: 100,
-					backdropFilter: "blur(8px)",
-				}}
-			>
-				<div>
-					<div
-						style={{
-							fontFamily: "Georgia, serif",
-							fontSize: "clamp(16px,2vw,22px)",
-							fontWeight: 700,
-							color: "#F0C060",
-							letterSpacing: "0.1em",
-						}}
-					>
-						Arquitectura del Sistema BI
-					</div>
-					<div
-						style={{
-							fontSize: "11px",
-							letterSpacing: "0.22em",
-							color: "#8A8070",
-							textTransform: "uppercase",
-							marginTop: "4px",
-						}}
-					>
-						Investigación e Inteligencia de Negocios · EIS9A261N
-					</div>
-				</div>
-				<Link href="/" className="arch-back-btn">
-					← Dashboard
-				</Link>
-			</header>
+const TECH_STACK = [
+  {
+    category: "Frontend",
+    items: [
+      { name: "Next.js", version: "16.1", desc: "App Router · Turbopack · SSR" },
+      { name: "React", version: "19.2", desc: "Server + Client Components" },
+      { name: "TypeScript", version: "5.9", desc: "Tipado estricto" },
+      { name: "Tailwind CSS", version: "4", desc: "Utility-first · dark theme" },
+      { name: "shadcn/ui", version: "4", desc: "Componentes accesibles" },
+      { name: "Recharts", version: "3.8", desc: "Gráficos interactivos" },
+    ],
+  },
+  {
+    category: "Bases de Datos",
+    items: [
+      { name: "PostgreSQL", version: "16", desc: "OLTP (3FN) + OLAP (Star Schema)" },
+      { name: "MongoDB", version: "7", desc: "Documentos clínicos · 6,986 registros" },
+      { name: "Redis", version: "7", desc: "Caché in-memory · 16 keys dashboard" },
+      { name: "Neo4j", version: "5", desc: "Knowledge Graph · 15k nodos" },
+      { name: "MinIO", version: "latest", desc: "Data Lake · 8 buckets · S3 API" },
+    ],
+  },
+  {
+    category: "Procesamiento",
+    items: [
+      { name: "Bun", version: "1.3", desc: "Runtime JS · ETL pipelines" },
+      { name: "Python", version: "3.12", desc: "scikit-learn · spaCy · Prophet" },
+      { name: "PySpark", version: "4.1", desc: "Big Data · Spark SQL · MLlib" },
+      { name: "Ollama", version: "latest", desc: "gemma3:1b · nomic-embed-text" },
+    ],
+  },
+  {
+    category: "Infraestructura",
+    items: [
+      { name: "Podman", version: "5.8", desc: "10 contenedores · compose" },
+      { name: "Fedora", version: "44", desc: "Sistema operativo host" },
+      { name: "Gemini API", version: "—", desc: "Chat IA principal · fallback Ollama" },
+    ],
+  },
+];
 
-			<main
-				style={{
-					maxWidth: "1100px",
-					margin: "0 auto",
-					padding: "60px 32px 100px",
-				}}
-			>
-				{/* Title block */}
-				<section style={{ marginBottom: "72px", textAlign: "center" }}>
-					<div
-						style={{
-							fontFamily: '"Courier New", monospace',
-							fontSize: "10px",
-							letterSpacing: "0.3em",
-							color: "#8A8070",
-							textTransform: "uppercase",
-							marginBottom: "16px",
-						}}
-					>
-						Documento técnico · Versión 2026-03
-					</div>
-					<h1
-						style={{
-							fontFamily: "Georgia, serif",
-							fontSize: "clamp(28px,4vw,52px)",
-							fontWeight: 700,
-							color: "#F0C060",
-							lineHeight: 1.1,
-							letterSpacing: "0.03em",
-							textShadow: "0 0 40px rgba(201,150,58,0.3)",
-						}}
-					>
-						Sistema de Business Intelligence
-						<br />
-						<span style={{ color: "#E8D5A3", fontStyle: "italic" }}>
-							Registro Oncológico · Ayacucho
-						</span>
-					</h1>
-					<div
-						style={{
-							width: "60px",
-							height: "2px",
-							background: "linear-gradient(90deg, #C9963A, transparent)",
-							margin: "20px auto",
-						}}
-					/>
-					<p
-						style={{
-							color: "#8A8070",
-							fontSize: "15px",
-							lineHeight: 1.7,
-							maxWidth: "620px",
-							margin: "0 auto",
-						}}
-					>
-						Arquitectura end-to-end para análisis descriptivo de casos
-						oncológicos nuevos registrados en el INEN con residencia declarada
-						en Ayacucho, Perú.
-					</p>
-				</section>
+export default function DataCatalogPage() {
+  return (
+    <div className="min-h-screen bg-background">
+      {/* ── Topbar ── */}
+      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex h-12 items-center justify-between px-4">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+              </span>
+              <span className="font-mono text-xs text-foreground font-semibold tracking-wider">
+                INEN ONCOLOGÍA
+              </span>
+            </div>
+            <span className="font-mono text-[10px] text-muted-foreground">
+              Data Catalog
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-mono text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
+            >
+              ← Dashboard
+            </Link>
+          </div>
+        </div>
+      </header>
 
-				{/* Mapa geográfico */}
-				<section style={{ marginBottom: "80px" }}>
-					<SectionTitle code="§0">
-						Área de Estudio — Ayacucho, Perú
-					</SectionTitle>
-					<div
-						style={{
-							background: "linear-gradient(135deg, #12111A, #1C1929)",
-							border: "1px solid rgba(201,150,58,0.2)",
-							borderRadius: "12px",
-							padding: "32px",
-							display: "grid",
-							gridTemplateColumns: "1fr 1fr",
-							gap: "40px",
-							alignItems: "center",
-						}}
-					>
-						<PeruMap height={480} />
-						<div
-							style={{ display: "flex", flexDirection: "column", gap: "20px" }}
-						>
-							<div>
-								<div
-									style={{
-										fontFamily: '"Courier New", monospace',
-										fontSize: "10px",
-										color: "#8A8070",
-										letterSpacing: "0.2em",
-										textTransform: "uppercase",
-										marginBottom: "8px",
-									}}
-								>
-									Región de análisis
-								</div>
-								<div
-									style={{
-										fontFamily: "Georgia, serif",
-										fontSize: "32px",
-										fontWeight: 700,
-										color: "#e84c3d",
-										lineHeight: 1.1,
-									}}
-								>
-									Ayacucho
-								</div>
-								<div
-									style={{
-										color: "#8A8070",
-										fontSize: "13px",
-										marginTop: "6px",
-									}}
-								>
-									Sierra sur del Perú · 43,814 km² · 11 provincias
-								</div>
-							</div>
-							{[
-								{
-									label: "Población (2024)",
-									value: "669,737 hab.",
-									color: "#C9963A",
-								},
-								{
-									label: "Casos INEN 2022–2025",
-									value: "1,687 pacientes",
-									color: "#e84c3d",
-								},
-								{
-									label: "Tasa incidencia 2024",
-									value: "64.6 por 100k",
-									color: "#f39c12",
-								},
-								{
-									label: "Altitud capital",
-									value: "2,746 m.s.n.m.",
-									color: "#2e86c1",
-								},
-								{
-									label: "Fuente de datos",
-									value: "INEN Lima · INEI",
-									color: "#1e8449",
-								},
-							].map((s) => (
-								<div
-									key={s.label}
-									style={{
-										display: "flex",
-										justifyContent: "space-between",
-										alignItems: "baseline",
-										borderBottom: "1px solid rgba(255,255,255,0.04)",
-										paddingBottom: "10px",
-									}}
-								>
-									<span
-										style={{
-											fontFamily: '"Courier New", monospace',
-											fontSize: "11px",
-											color: "#555",
-											letterSpacing: "0.04em",
-										}}
-									>
-										{s.label}
-									</span>
-									<span
-										style={{
-											fontFamily: '"Courier New", monospace',
-											fontSize: "13px",
-											color: s.color,
-											fontWeight: 700,
-										}}
-									>
-										{s.value}
-									</span>
-								</div>
-							))}
-						</div>
-					</div>
-				</section>
+      <main className="max-w-5xl mx-auto px-4 py-6 space-y-8">
+        {/* ── Hero ── */}
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Data Catalog
+          </h1>
+          <p className="text-sm text-muted-foreground max-w-2xl">
+            Fuentes de datos, infraestructura tecnológica y métricas del sistema
+            de Business Intelligence para análisis oncológico en el Perú.
+          </p>
+        </div>
 
-				{/* Architecture Diagram SVG */}
-				<section style={{ marginBottom: "80px" }}>
-					<SectionTitle code="§1">Diagrama de Arquitectura</SectionTitle>
-					<div
-						style={{
-							background: "linear-gradient(135deg, #12111A, #1C1929)",
-							border: "1px solid rgba(201,150,58,0.2)",
-							borderRadius: "12px",
-							padding: "40px 24px",
-							overflow: "hidden",
-							position: "relative",
-						}}
-					>
-						{/* Pattern bg */}
-						<div
-							style={{
-								position: "absolute",
-								inset: 0,
-								opacity: 0.04,
-								backgroundImage:
-									"repeating-linear-gradient(45deg, #C9963A 0, #C9963A 1px, transparent 0, transparent 50%)",
-								backgroundSize: "20px 20px",
-							}}
-						/>
-						<ArchDiagram />
-					</div>
-				</section>
+        {/* ── Stats Grid ── */}
+        <div className="grid grid-cols-4 gap-3">
+          {STATS.map((s) => (
+            <Card key={s.label} size="sm" className="hover:border-primary/30 transition-colors">
+              <CardContent className="p-3 flex items-center gap-3">
+                <span className="text-xl">{s.icon}</span>
+                <div>
+                  <div className="text-lg font-bold font-mono text-foreground">
+                    {s.value}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {s.label}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
-				{/* Layers */}
-				<section style={{ marginBottom: "80px" }}>
-					<SectionTitle code="§2">Capas de la Arquitectura</SectionTitle>
-					<div
-						style={{ display: "flex", flexDirection: "column", gap: "16px" }}
-					>
-						<LayerCard
-							num="00"
-							color="#2e86c1"
-							title="Fuentes de Datos"
-							subtitle="INEN + INEI · Raw Data"
-							items={[
-								{
-									icon: "📄",
-									label: "inen_pacientes_2022_2025.csv",
-									desc: "~1,700 registros · encoding latin-1 · campos: LUGAR_RESIDENCIA, FEC_FILIACION, SEXO, PROV_RESIDENCIA, NUM_CEX",
-								},
-								{
-									icon: "📊",
-									label: "inei_poblacion_departamentos.xlsx",
-									desc: "Estimaciones y Proyecciones 2000–2026 · Ubigeo Ayacucho: 050000 · 4 hojas por trienio",
-								},
-							]}
-						/>
-						<LayerCard
-							num="01"
-							color="#1e8449"
-							title="ETL — Extracción, Transformación y Carga"
-							subtitle="etl/process.ts · Bun runtime"
-							items={[
-								{
-									icon: "⚙️",
-									label: "Extracción",
-									desc: "Lectura CSV con PapaParse (latin-1) · lectura Excel con xlsx",
-								},
-								{
-									icon: "🔄",
-									label: "Transformación",
-									desc: 'Filtro LUGAR_RESIDENCIA ⊇ "AYACUCHO" · parseo FEC_FILIACION AAAAMMDD → año/mes · grupos etarios · tasa = (casos/población)×100k',
-								},
-								{
-									icon: "💾",
-									label: "Carga",
-									desc: "Output: app/data/processed/ayacucho.json · commiteado al repo · sin dependencia de ejecución ETL en runtime",
-								},
-							]}
-						/>
-						<LayerCard
-							num="02"
-							color="#C9963A"
-							title="Data Warehouse — Modelo Multidimensional"
-							subtitle="ayacucho.json · Star Schema"
-							items={[
-								{
-									icon: "⭐",
-									label: "Tabla de Hechos",
-									desc: "Casos oncológicos nuevos · métricas: casos (int), tasa_por_100k (float), promedio_cex (float)",
-								},
-								{
-									icon: "📅",
-									label: "Dimensión Tiempo",
-									desc: "año (2022–2025), mes (1–12) · 2025 marcado como año_parcial = true",
-								},
-								{
-									icon: "🗺️",
-									label: "Dimensión Geografía",
-									desc: "provincia de residencia declarada al ingreso INEN · 11 provincias de Ayacucho",
-								},
-								{
-									icon: "👤",
-									label: "Dimensión Paciente",
-									desc: "sexo (FEMENINO/MASCULINO), grupo etario (0-20, 21-30, …, 81+)",
-								},
-								{
-									icon: "🏥",
-									label: "Dimensión Fuente",
-									desc: "INEN Lima · INEI proyecciones · metadata de corte y limitaciones",
-								},
-							]}
-						/>
-						<LayerCard
-							num="03"
-							color="#7d3c98"
-							title="Capa LLM — Inteligencia Artificial Aplicada"
-							subtitle="lib/ai.ts · Gemini 3 Flash Preview → Claude Haiku fallback"
-							items={[
-								{
-									icon: "🤖",
-									label: "Gemini 3 Flash Preview",
-									desc: "Modelo primario · Google AI Studio · tier gratuito · system instruction + JSON completo del Data Warehouse como contexto",
-								},
-								{
-									icon: "🔄",
-									label: "Claude Haiku fallback",
-									desc: "Modelo secundario · Anthropic API · se activa si Gemini falla o key no disponible",
-								},
-								{
-									icon: "📋",
-									label: "System Prompt",
-									desc: "Rol: analista BI de salud pública peruana · Reglas: solo datos disponibles, aclarar 2025 parcial, responder en español, formato JSON estricto: { texto, grafica }",
-								},
-								{
-									icon: "🔢",
-									label: "Data Vector (contexto)",
-									desc: "Todo ayacucho.json inyectado en el system prompt → el LLM opera sobre el Data Warehouse completo en cada consulta",
-								},
-							]}
-						/>
-						<LayerCard
-							num="04"
-							color="#e84c3d"
-							title="Data Grafos — Visualización"
-							subtitle="components/ChartRenderer.tsx · Recharts"
-							items={[
-								{
-									icon: "📊",
-									label: "BarChart",
-									desc: "Comparativas anuales, distribución por provincia, grupos etarios",
-								},
-								{
-									icon: "📈",
-									label: "LineChart",
-									desc: "Tendencias temporales, variación mensual, evolución tasa por 100k",
-								},
-								{
-									icon: "🥧",
-									label: "PieChart (donut)",
-									desc: "Distribución por sexo, proporciones relativas",
-								},
-								{
-									icon: "🏔️",
-									label: "AreaChart",
-									desc: "Acumulados temporales, volumen por período",
-								},
-								{
-									icon: "🔌",
-									label: "Protocolo",
-									desc: "LLM devuelve JSON { tipo, titulo, datos[], ejeX, ejeY } → ChartRenderer renderiza el componente Recharts correspondiente",
-								},
-							]}
-						/>
-						<LayerCard
-							num="05"
-							color="#F0C060"
-							title="Frontend — Interfaz Web"
-							subtitle="Next.js 15 · App Router · Bun · TypeScript"
-							items={[
-								{
-									icon: "🖥️",
-									label: "HeroSection",
-									desc: "Stats 2024 al cargar: casos, tasa/100k, % femenino, provincia top · sparkline ECG mensual · datos servidos server-side",
-								},
-								{
-									icon: "💬",
-									label: "ChatInterface",
-									desc: "Terminal de consulta interactiva · historial scrollable · sugerencias predefinidas · indicador de estado (LISTO/PROCESANDO)",
-								},
-								{
-									icon: "📑",
-									label: "DataPanel",
-									desc: "Fuentes INEN/INEI · limitaciones L-01…L-04 · metodología tasa bruta · aviso año parcial 2025",
-								},
-								{
-									icon: "🔗",
-									label: "API Routes",
-									desc: "GET /api/data → ayacucho.json completo · POST /api/chat → callAI(systemPrompt, message, history) → { texto, grafica }",
-								},
-							]}
-						/>
-					</div>
-				</section>
+        <Separator />
 
-				{/* Modelo multidimensional detalle */}
-				<section style={{ marginBottom: "80px" }}>
-					<SectionTitle code="§3">
-						Modelo de Datos Multidimensional
-					</SectionTitle>
-					<div
-						style={{
-							background: "linear-gradient(135deg, #12111A, #1C1929)",
-							border: "1px solid rgba(201,150,58,0.2)",
-							borderRadius: "12px",
-							padding: "40px",
-						}}
-					>
-						<StarSchemaTable />
-					</div>
-				</section>
+        {/* ── Tabs ── */}
+        <Tabs defaultValue="fuentes" className="w-full">
+          <TabsList className="bg-secondary border border-border w-full justify-start">
+            <TabsTrigger
+              value="fuentes"
+              className="data-[state=active]:bg-card data-[state=active]:text-primary text-xs font-mono gap-2"
+            >
+              <Database className="h-3.5 w-3.5" />
+              Fuentes de Datos
+            </TabsTrigger>
+            <TabsTrigger
+              value="stack"
+              className="data-[state=active]:bg-card data-[state=active]:text-primary text-xs font-mono gap-2"
+            >
+              <Layers className="h-3.5 w-3.5" />
+              Stack Tecnológico
+            </TabsTrigger>
+            <TabsTrigger
+              value="metricas"
+              className="data-[state=active]:bg-card data-[state=active]:text-primary text-xs font-mono gap-2"
+            >
+              <BarChart4 className="h-3.5 w-3.5" />
+              Métricas
+            </TabsTrigger>
+          </TabsList>
 
-				{/* Limitaciones */}
-				<section style={{ marginBottom: "80px" }}>
-					<SectionTitle code="§4">Limitaciones del Sistema</SectionTitle>
-					<div
-						style={{
-							display: "grid",
-							gridTemplateColumns: "repeat(auto-fit, minmax(260px,1fr))",
-							gap: "16px",
-						}}
-					>
-						{[
-							{
-								code: "L-01",
-								title: "Cobertura INEN",
-								text: "Solo pacientes que llegaron al INEN en Lima. No representa la totalidad de casos oncológicos en Ayacucho.",
-							},
-							{
-								code: "L-02",
-								title: "Sin CIE-10",
-								text: "No incluye diagnóstico por tipo de cáncer. El clasificador no es publicado en datos abiertos por el INEN.",
-							},
-							{
-								code: "L-03",
-								title: "Solo incidencia",
-								text: "Datos de casos nuevos (incidencia). Sin mortalidad, sobrevivencia ni seguimiento de pacientes.",
-							},
-							{
-								code: "L-04",
-								title: "Proyecciones INEI",
-								text: "Población 2023–2026 son proyecciones, no datos censales. El último censo fue en 2017.",
-							},
-							{
-								code: "L-05",
-								title: "2025 parcial",
-								text: "Datos solo hasta noviembre 2025. No comparar directamente con años completos 2022–2024.",
-							},
-						].map((l) => (
-							<div
-								key={l.code}
-								style={{
-									background: "rgba(201,150,58,0.04)",
-									border: "1px solid rgba(201,150,58,0.12)",
-									borderLeft: "3px solid rgba(201,150,58,0.4)",
-									borderRadius: "2px 8px 8px 2px",
-									padding: "20px",
-								}}
-							>
-								<div
-									style={{
-										display: "flex",
-										alignItems: "center",
-										gap: "10px",
-										marginBottom: "8px",
-									}}
-								>
-									<span
-										style={{
-											fontFamily: '"Courier New", monospace',
-											fontSize: "10px",
-											color: "#C9963A",
-											letterSpacing: "0.06em",
-										}}
-									>
-										{l.code}
-									</span>
-									<span
-										style={{
-											fontFamily: "Georgia, serif",
-											fontSize: "13px",
-											color: "#F0C060",
-											fontWeight: 600,
-										}}
-									>
-										{l.title}
-									</span>
-								</div>
-								<p
-									style={{
-										color: "#8A8070",
-										fontSize: "13px",
-										lineHeight: 1.6,
-									}}
-								>
-									{l.text}
-								</p>
-							</div>
-						))}
-					</div>
-				</section>
+          {/* ── Tab: Fuentes ── */}
+          <TabsContent value="fuentes" className="space-y-4 mt-4">
+            {FUENTES.map((f) => (
+              <Card key={f.name} className="overflow-hidden">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-sm font-mono text-foreground">
+                        {f.name}{" "}
+                        <span className="text-muted-foreground font-normal">
+                          — {f.label}
+                        </span>
+                      </CardTitle>
+                      <CardDescription className="text-xs mt-1">
+                        {f.note}
+                      </CardDescription>
+                    </div>
+                    <Badge variant="outline" className="font-mono text-[10px]">
+                      {f.rows} registros
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-2 pb-4">
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground font-mono">
+                    <span>📁 {f.file}</span>
+                    <span>📅 {f.period}</span>
+                    <span>📐 {f.format}</span>
+                    <span>💾 {f.size}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {f.columns.map((col) => (
+                      <Badge
+                        key={col}
+                        variant="secondary"
+                        className="text-[10px] font-mono"
+                      >
+                        {col}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </TabsContent>
 
-				{/* Flujo de una consulta */}
-				<section style={{ marginBottom: "80px" }}>
-					<SectionTitle code="§5">Flujo de una Consulta</SectionTitle>
-					<div
-						style={{
-							background: "linear-gradient(135deg, #12111A, #1C1929)",
-							border: "1px solid rgba(201,150,58,0.2)",
-							borderRadius: "12px",
-							padding: "40px",
-						}}
-					>
-						<div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
-							{[
-								{
-									step: "1",
-									color: "#2e86c1",
-									label: "Usuario escribe pregunta",
-									detail: '"¿Cuántos casos hubo en 2023?"',
-								},
-								{
-									step: "2",
-									color: "#1e8449",
-									label: "ChatInterface → POST /api/chat",
-									detail: "{ message, history[] }",
-								},
-								{
-									step: "3",
-									color: "#C9963A",
-									label: "API lee ayacucho.json completo",
-									detail: "lib/data.ts → getAyacuchoData()",
-								},
-								{
-									step: "4",
-									color: "#7d3c98",
-									label: "Construye system prompt con datos",
-									detail: "Rol + Reglas + JSON del Data Warehouse inyectado",
-								},
-								{
-									step: "5",
-									color: "#e84c3d",
-									label: "callAI() → Gemini 3 Flash",
-									detail: "Si falla → fallback Claude Haiku",
-								},
-								{
-									step: "6",
-									color: "#f39c12",
-									label: "LLM responde JSON estructurado",
-									detail:
-										'{ "texto": "...", "grafica": { tipo, titulo, datos[] } }',
-								},
-								{
-									step: "7",
-									color: "#F0C060",
-									label: "parseAIResponse() valida y extrae",
-									detail:
-										"try/catch → si no es JSON válido, devuelve texto plano sin gráfica",
-								},
-								{
-									step: "8",
-									color: "#22c55e",
-									label: "Frontend renderiza respuesta",
-									detail:
-										"texto en ChatInterface + ChartRenderer con datos de la gráfica",
-								},
-							].map((s, i, arr) => (
-								<div
-									key={s.step}
-									style={{
-										display: "flex",
-										gap: "20px",
-										alignItems: "flex-start",
-									}}
-								>
-									<div
-										style={{
-											display: "flex",
-											flexDirection: "column",
-											alignItems: "center",
-										}}
-									>
-										<div
-											style={{
-												width: "32px",
-												height: "32px",
-												borderRadius: "50%",
-												flexShrink: 0,
-												background: `${s.color}22`,
-												border: `1.5px solid ${s.color}`,
-												display: "flex",
-												alignItems: "center",
-												justifyContent: "center",
-												fontFamily: '"Courier New", monospace',
-												fontSize: "11px",
-												color: s.color,
-												fontWeight: 700,
-											}}
-										>
-											{s.step}
-										</div>
-										{i < arr.length - 1 && (
-											<div
-												style={{
-													width: "1px",
-													height: "24px",
-													background: `${s.color}30`,
-												}}
-											/>
-										)}
-									</div>
-									<div
-										style={{
-											paddingTop: "6px",
-											paddingBottom: i < arr.length - 1 ? "0" : "0",
-										}}
-									>
-										<div
-											style={{
-												fontFamily: "Georgia, serif",
-												fontSize: "14px",
-												color: "#E8D5A3",
-												fontWeight: 600,
-												marginBottom: "2px",
-											}}
-										>
-											{s.label}
-										</div>
-										<div
-											style={{
-												fontFamily: '"Courier New", monospace',
-												fontSize: "11px",
-												color: "#555",
-												letterSpacing: "0.03em",
-												marginBottom: "12px",
-											}}
-										>
-											{s.detail}
-										</div>
-									</div>
-								</div>
-							))}
-						</div>
-					</div>
-				</section>
+          {/* ── Tab: Stack ── */}
+          <TabsContent value="stack" className="space-y-6 mt-4">
+            {TECH_STACK.map((group) => (
+              <div key={group.category}>
+                <h3 className="text-xs font-mono font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                  {group.category}
+                </h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[140px]">Tecnología</TableHead>
+                      <TableHead className="w-[60px]">Versión</TableHead>
+                      <TableHead>Rol</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {group.items.map((item) => (
+                      <TableRow key={item.name}>
+                        <TableCell className="font-mono text-xs font-medium text-foreground">
+                          {item.name}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {item.version}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {item.desc}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ))}
+          </TabsContent>
 
-				{/* Footer ref */}
-				<footer
-					style={{
-						borderTop: "1px solid rgba(201,150,58,0.1)",
-						paddingTop: "24px",
-						textAlign: "center",
-					}}
-				>
-					<p
-						style={{
-							fontFamily: '"Courier New", monospace',
-							fontSize: "11px",
-							color: "#333",
-							letterSpacing: "0.08em",
-							textTransform: "uppercase",
-						}}
-					>
-						Escuela La Pontificia · Ingeniería de Sistemas de Información ·
-						Noveno Semestre · 2026
-					</p>
-				</footer>
-			</main>
-		</div>
-	);
-}
+          {/* ── Tab: Métricas ── */}
+          <TabsContent value="metricas" className="mt-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm font-mono">Calidad de Datos</CardTitle>
+                  <CardDescription className="text-xs">
+                    Data Quality Checks ejecutados sobre OLTP + OLAP
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-muted-foreground">OLTP</span>
+                        <span className="font-mono text-emerald-400">12/12 checks</span>
+                      </div>
+                      <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-emerald-500 w-full" />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-muted-foreground">OLAP</span>
+                        <span className="font-mono text-emerald-400">7/7 checks</span>
+                      </div>
+                      <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-emerald-500 w-full" />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-muted-foreground">FK Integrity</span>
+                        <span className="font-mono text-emerald-400">100%</span>
+                      </div>
+                      <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-emerald-500 w-full" />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-muted-foreground">Unicidad UUID</span>
+                        <span className="font-mono text-emerald-400">100%</span>
+                      </div>
+                      <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-emerald-500 w-full" />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-// ─── Sub-components ───────────────────────────────────────────────
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm font-mono">Cobertura del Sílabo</CardTitle>
+                  <CardDescription className="text-xs">
+            EIS9A261N — Investigación e Inteligencia de Negocios
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {[
+                      { label: "Unidad 1 — Visión BI y Analítica", pct: 100 },
+                      { label: "Unidad 2 — Infraestructura y Arquitectura", pct: 100 },
+                      { label: "Unidad 3 — Analítica y Minería", pct: 100 },
+                      { label: "Unidad 4 — IA y Ciencia de Datos", pct: 100 },
+                    ].map((u) => (
+                      <div key={u.label}>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-muted-foreground">{u.label}</span>
+                          <span className="font-mono text-primary">{u.pct}%</span>
+                        </div>
+                        <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-primary transition-all"
+                            style={{ width: `${u.pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
 
-function SectionTitle({
-	code,
-	children,
-}: {
-	code: string;
-	children: React.ReactNode;
-}) {
-	return (
-		<div
-			style={{
-				display: "flex",
-				alignItems: "baseline",
-				gap: "12px",
-				marginBottom: "24px",
-				paddingBottom: "14px",
-				borderBottom: "1px solid rgba(201,150,58,0.12)",
-			}}
-		>
-			<span
-				style={{
-					fontFamily: '"Courier New", monospace',
-					fontSize: "11px",
-					color: "#555",
-					letterSpacing: "0.06em",
-				}}
-			>
-				{code}
-			</span>
-			<span
-				style={{
-					fontFamily: "Georgia, serif",
-					color: "#C9963A",
-					fontSize: "16px",
-					fontWeight: 700,
-					letterSpacing: "0.12em",
-					textTransform: "uppercase",
-				}}
-			>
-				{children}
-			</span>
-		</div>
-	);
-}
+              <Card className="col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-sm font-mono flex items-center gap-2">
+                    <Workflow className="h-4 w-4 text-primary" />
+                    Pipeline de Datos
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Flujo end-to-end: 7 etapas desde la fuente cruda hasta el dashboard
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="relative">
+                    {/* Línea vertical */}
+                    <div className="absolute left-[19px] top-3 bottom-3 w-px bg-border" />
 
-function LayerCard({
-	num,
-	color,
-	title,
-	subtitle,
-	items,
-}: {
-	num: string;
-	color: string;
-	title: string;
-	subtitle: string;
-	items: { icon: string; label: string; desc: string }[];
-}) {
-	return (
-		<div
-			style={{
-				background: "linear-gradient(135deg, #12111A, #1C1929)",
-				border: `1px solid ${color}25`,
-				borderLeft: `3px solid ${color}`,
-				borderRadius: "2px 10px 10px 2px",
-				overflow: "hidden",
-			}}
-		>
-			<div
-				style={{
-					padding: "16px 24px",
-					borderBottom: `1px solid ${color}15`,
-					display: "flex",
-					alignItems: "center",
-					gap: "14px",
-					background: `${color}08`,
-				}}
-			>
-				<span
-					style={{
-						fontFamily: '"Courier New", monospace',
-						fontSize: "11px",
-						color,
-						letterSpacing: "0.1em",
-						fontWeight: 700,
-					}}
-				>
-					CAPA {num}
-				</span>
-				<div>
-					<div
-						style={{
-							fontFamily: "Georgia, serif",
-							fontSize: "16px",
-							color: "#E8D5A3",
-							fontWeight: 700,
-						}}
-					>
-						{title}
-					</div>
-					<div
-						style={{
-							fontFamily: '"Courier New", monospace',
-							fontSize: "10px",
-							color: "#555",
-							letterSpacing: "0.05em",
-							marginTop: "2px",
-						}}
-					>
-						{subtitle}
-					</div>
-				</div>
-			</div>
-			<div
-				style={{
-					padding: "16px 24px",
-					display: "grid",
-					gridTemplateColumns: "repeat(auto-fit, minmax(260px,1fr))",
-					gap: "12px",
-				}}
-			>
-				{items.map((item) => (
-					<div
-						key={item.label}
-						style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}
-					>
-						<span style={{ fontSize: "16px", flexShrink: 0, marginTop: "1px" }}>
-							{item.icon}
-						</span>
-						<div>
-							<div
-								style={{
-									fontSize: "12px",
-									fontWeight: 600,
-									color: "#C9963A",
-									marginBottom: "2px",
-								}}
-							>
-								{item.label}
-							</div>
-							<div
-								style={{ fontSize: "12px", color: "#8A8070", lineHeight: 1.55 }}
-							>
-								{item.desc}
-							</div>
-						</div>
-					</div>
-				))}
-			</div>
-		</div>
-	);
-}
+                    <div className="space-y-0">
+                      {[
+                        {
+                          step: "01",
+                          label: "Ingesta Raw",
+                          tech: "INEN CSV · SINADEF CSV · INEI XLSX · DPCAN · ENDES · SIS",
+                          detail: "6 fuentes · 2.9 GB · encoding latin-1, pipe, semicolon",
+                          icon: FileSpreadsheet,
+                          color: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+                        },
+                        {
+                          step: "02",
+                          label: "Data Lake",
+                          tech: "MinIO · 8 buckets · S3-compatible API",
+                          detail: "59 objetos raw inmutables · particionado por fuente",
+                          icon: HardDrive,
+                          color: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20",
+                        },
+                        {
+                          step: "03",
+                          label: "ETL → OLTP",
+                          tech: "Bun + PapaParse · PostgreSQL 16 · 3FN",
+                          detail: "204k pacientes · 66k atenciones · 138k diagnósticos · 100% data quality",
+                          icon: ArrowDown,
+                          color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+                        },
+                        {
+                          step: "04",
+                          label: "OLTP → OLAP",
+                          tech: "Star Schema · 6 dimensiones · PostgreSQL 16",
+                          detail: "204k hechos · dims: tiempo, geografía, paciente, diagnóstico, establecimiento, fuente",
+                          icon: GitBranch,
+                          color: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+                        },
+                        {
+                          step: "05",
+                          label: "Enriquecimiento",
+                          tech: "MongoDB 7 · Neo4j 5 · Redis 7",
+                          detail: "6,986 docs clínicos · 15k nodos grafo conocimiento · 16 keys caché",
+                          icon: Layers,
+                          color: "text-purple-400 bg-purple-500/10 border-purple-500/20",
+                        },
+                        {
+                          step: "06",
+                          label: "Analítica",
+                          tech: "Python scikit-learn · spaCy · PySpark · Ollama",
+                          detail: "Clustering K-means · Random Forest · NLP (NER/POS/Sentimiento) · Red Neuronal MLP",
+                          icon: BarChart4,
+                          color: "text-rose-400 bg-rose-500/10 border-rose-500/20",
+                        },
+                        {
+                          step: "07",
+                          label: "Visualización",
+                          tech: "Next.js 16 · Recharts · shadcn/ui · Gemini/Ollama Chat",
+                          detail: "Dashboard interactivo · Data Storytelling · BSC · OKRs · Chat IA con RAG",
+                          icon: Server,
+                          color: "text-orange-400 bg-orange-500/10 border-orange-500/20",
+                        },
+                      ].map((s, i) => (
+                        <div key={s.step} className="relative flex gap-4 pb-5 last:pb-0">
+                          {/* Círculo */}
+                          <div
+                            className={`relative z-10 flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full border text-xs font-mono font-bold ${s.color}`}
+                          >
+                            {s.step}
+                          </div>
+                          {/* Contenido */}
+                          <div className="flex-1 pt-1">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="text-xs font-semibold text-foreground">
+                                {s.label}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {s.tech}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed">
+                              {s.detail}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
 
-function StarSchemaTable() {
-	const dims = [
-		{
-			name: "DIM_TIEMPO",
-			color: "#2e86c1",
-			fields: ["año (PK)", "mes (PK)", "completo (bool)", "nota_parcial"],
-		},
-		{
-			name: "DIM_GEOGRAFIA",
-			color: "#1e8449",
-			fields: ["provincia (PK)", "departamento"],
-		},
-		{
-			name: "DIM_PACIENTE",
-			color: "#7d3c98",
-			fields: ["sexo (PK)", "grupo_etario (PK)"],
-		},
-		{
-			name: "DIM_FUENTE",
-			color: "#C9963A",
-			fields: ["id_fuente (PK)", "nombre", "rango_fechas", "nota"],
-		},
-	];
-	return (
-		<div>
-			<div style={{ textAlign: "center", marginBottom: "36px" }}>
-				{/* FACT TABLE */}
-				<div
-					style={{
-						display: "inline-block",
-						background: "rgba(232,76,61,0.08)",
-						border: "2px solid rgba(232,76,61,0.5)",
-						borderRadius: "8px",
-						padding: "20px 32px",
-						minWidth: "220px",
-					}}
-				>
-					<div
-						style={{
-							fontFamily: '"Courier New", monospace',
-							fontSize: "10px",
-							color: "#e84c3d",
-							letterSpacing: "0.15em",
-							textTransform: "uppercase",
-							marginBottom: "10px",
-						}}
-					>
-						Tabla de Hechos
-					</div>
-					<div
-						style={{
-							fontFamily: "Georgia, serif",
-							fontSize: "16px",
-							color: "#F0C060",
-							fontWeight: 700,
-							marginBottom: "12px",
-						}}
-					>
-						FACT_ONCOLOGIA
-					</div>
-					{[
-						"año (FK → DIM_TIEMPO)",
-						"mes (FK → DIM_TIEMPO)",
-						"provincia (FK → DIM_GEOGRAFIA)",
-						"sexo (FK → DIM_PACIENTE)",
-						"grupo_etario (FK → DIM_PACIENTE)",
-						"─────────────",
-						"casos (medida)",
-						"tasa_por_100k (medida)",
-						"promedio_cex (medida)",
-					].map((f) => (
-						<div
-							key={f}
-							style={{
-								fontFamily: '"Courier New", monospace',
-								fontSize: "11px",
-								color: f.startsWith("─")
-									? "#333"
-									: f.includes("FK")
-										? "#C9963A"
-										: "#e84c3d",
-								letterSpacing: "0.02em",
-								lineHeight: 1.6,
-							}}
-						>
-							{f}
-						</div>
-					))}
-				</div>
-			</div>
-
-			{/* DIMENSIONS */}
-			<div
-				style={{
-					display: "grid",
-					gridTemplateColumns: "repeat(auto-fit, minmax(200px,1fr))",
-					gap: "16px",
-				}}
-			>
-				{dims.map((d) => (
-					<div
-						key={d.name}
-						style={{
-							background: `${d.color}08`,
-							border: `1px solid ${d.color}30`,
-							borderRadius: "8px",
-							padding: "16px 20px",
-						}}
-					>
-						<div
-							style={{
-								fontFamily: '"Courier New", monospace',
-								fontSize: "10px",
-								color: d.color,
-								letterSpacing: "0.12em",
-								textTransform: "uppercase",
-								marginBottom: "8px",
-							}}
-						>
-							Dimensión
-						</div>
-						<div
-							style={{
-								fontFamily: "Georgia, serif",
-								fontSize: "13px",
-								color: "#E8D5A3",
-								fontWeight: 700,
-								marginBottom: "10px",
-							}}
-						>
-							{d.name}
-						</div>
-						{d.fields.map((f) => (
-							<div
-								key={f}
-								style={{
-									fontFamily: '"Courier New", monospace',
-									fontSize: "11px",
-									color: "#555",
-									lineHeight: 1.6,
-								}}
-							>
-								{f}
-							</div>
-						))}
-					</div>
-				))}
-			</div>
-		</div>
-	);
-}
-
-function ArchDiagram() {
-	return (
-		<div style={{ position: "relative", maxWidth: "800px", margin: "0 auto" }}>
-			<svg viewBox="0 0 800 420" style={{ width: "100%", overflow: "visible" }}>
-				{/* Arrows */}
-				<defs>
-					<marker
-						id="arrow-gold"
-						markerWidth="10"
-						markerHeight="7"
-						refX="9"
-						refY="3.5"
-						orient="auto"
-					>
-						<polygon points="0 0, 10 3.5, 0 7" fill="#C9963A" opacity="0.7" />
-					</marker>
-					<marker
-						id="arrow-blue"
-						markerWidth="10"
-						markerHeight="7"
-						refX="9"
-						refY="3.5"
-						orient="auto"
-					>
-						<polygon points="0 0, 10 3.5, 0 7" fill="#2e86c1" opacity="0.7" />
-					</marker>
-					<marker
-						id="arrow-red"
-						markerWidth="10"
-						markerHeight="7"
-						refX="9"
-						refY="3.5"
-						orient="auto"
-					>
-						<polygon points="0 0, 10 3.5, 0 7" fill="#e84c3d" opacity="0.7" />
-					</marker>
-				</defs>
-
-				{/* FUENTES → ETL */}
-				<line
-					x1="170"
-					y1="64"
-					x2="170"
-					y2="108"
-					stroke="#2e86c1"
-					strokeWidth="1.5"
-					strokeDasharray="4 3"
-					markerEnd="url(#arrow-blue)"
-					opacity="0.6"
-				/>
-				<line
-					x1="350"
-					y1="64"
-					x2="295"
-					y2="108"
-					stroke="#2e86c1"
-					strokeWidth="1.5"
-					strokeDasharray="4 3"
-					markerEnd="url(#arrow-blue)"
-					opacity="0.6"
-				/>
-
-				{/* ETL → DW */}
-				<line
-					x1="230"
-					y1="156"
-					x2="230"
-					y2="196"
-					stroke="#C9963A"
-					strokeWidth="1.5"
-					markerEnd="url(#arrow-gold)"
-					opacity="0.7"
-				/>
-
-				{/* DW → LLM */}
-				<line
-					x1="400"
-					y1="244"
-					x2="510"
-					y2="244"
-					stroke="#C9963A"
-					strokeWidth="1.5"
-					strokeDasharray="5 3"
-					markerEnd="url(#arrow-gold)"
-					opacity="0.5"
-				/>
-				<line
-					x1="230"
-					y1="268"
-					x2="230"
-					y2="308"
-					stroke="#C9963A"
-					strokeWidth="1.5"
-					markerEnd="url(#arrow-gold)"
-					opacity="0.7"
-				/>
-
-				{/* LLM → Grafos */}
-				<line
-					x1="600"
-					y1="300"
-					x2="680"
-					y2="244"
-					stroke="#e84c3d"
-					strokeWidth="1.5"
-					markerEnd="url(#arrow-red)"
-					opacity="0.7"
-				/>
-
-				{/* LLM → Web */}
-				<line
-					x1="570"
-					y1="336"
-					x2="400"
-					y2="370"
-					stroke="#e84c3d"
-					strokeWidth="1.5"
-					markerEnd="url(#arrow-red)"
-					opacity="0.7"
-				/>
-				<line
-					x1="230"
-					y1="376"
-					x2="332"
-					y2="376"
-					stroke="#e84c3d"
-					strokeWidth="1.5"
-					markerEnd="url(#arrow-red)"
-					opacity="0.7"
-				/>
-
-				{/* ── FUENTES ── */}
-				<NodeBox
-					x={80}
-					y={20}
-					w={160}
-					h={44}
-					color="#2e86c1"
-					label="INEN CSV"
-					sub="1,687 registros · 2022-2025"
-				/>
-				<NodeBox
-					x={260}
-					y={20}
-					w={160}
-					h={44}
-					color="#2e86c1"
-					label="INEI Excel"
-					sub="Proyecciones · Ubigeo 050000"
-				/>
-
-				{/* ── ETL ── */}
-				<NodeBox
-					x={120}
-					y={108}
-					w={220}
-					h={48}
-					color="#1e8449"
-					label="ETL · etl/process.ts"
-					sub="PapaParse + xlsx · bun runtime"
-				/>
-
-				{/* ── DATA WAREHOUSE ── */}
-				<NodeBox
-					x={80}
-					y={196}
-					w={320}
-					h={72}
-					color="#C9963A"
-					label="Data Warehouse · ayacucho.json"
-					sub="Star Schema: Hechos + 4 Dimensiones&#10;Tiempo · Geografía · Paciente · Fuente"
-					big
-				/>
-
-				{/* ── LLM ── */}
-				<HexNode
-					cx={595}
-					cy={310}
-					r={58}
-					color="#7d3c98"
-					label="LLM"
-					sub="Gemini 3 Flash"
-				/>
-
-				{/* ── DATA VECTOR ── */}
-				<NodeBox
-					x={440}
-					y={196}
-					w={180}
-					h={48}
-					color="#C9963A"
-					label="Data Vector"
-					sub="ayacucho.json → system prompt"
-				/>
-
-				{/* ── DATA GRAFOS ── */}
-				<NodeBox
-					x={620}
-					y={180}
-					w={160}
-					h={64}
-					color="#e84c3d"
-					label="Data Grafos"
-					sub="Recharts · Bar/Line/Pie/Area"
-				/>
-
-				{/* ── WEB ── */}
-				<NodeBox
-					x={80}
-					y={340}
-					w={280}
-					h={64}
-					color="#F0C060"
-					label="Web · Next.js 15"
-					sub="HeroSection · ChatInterface · ChartRenderer&#10;DataPanel · App Router · TypeScript"
-					big
-				/>
-
-				{/* Labels on arrows */}
-				<text x="248" y="182" fill="#555" fontSize="9" fontFamily="monospace">
-					ETL output
-				</text>
-				<text x="298" y="238" fill="#555" fontSize="9" fontFamily="monospace">
-					context
-				</text>
-				<text x="248" y="302" fill="#555" fontSize="9" fontFamily="monospace">
-					query
-				</text>
-				<text x="460" y="364" fill="#555" fontSize="9" fontFamily="monospace">
-					respuesta JSON
-				</text>
-			</svg>
-		</div>
-	);
-}
-
-function NodeBox({
-	x,
-	y,
-	w,
-	h,
-	color,
-	label,
-	sub,
-	big,
-}: {
-	x: number;
-	y: number;
-	w: number;
-	h: number;
-	color: string;
-	label: string;
-	sub: string;
-	big?: boolean;
-}) {
-	return (
-		<g>
-			<rect
-				x={x}
-				y={y}
-				width={w}
-				height={h}
-				rx="6"
-				fill={`${color}12`}
-				stroke={color}
-				strokeWidth="1.2"
-				strokeOpacity="0.5"
-			/>
-			<text
-				x={x + w / 2}
-				y={y + (big ? 22 : 18)}
-				textAnchor="middle"
-				fill="#E8D5A3"
-				fontSize={big ? 13 : 12}
-				fontFamily="Georgia, serif"
-				fontWeight="700"
-			>
-				{label}
-			</text>
-			{sub.split("&#10;").map((line, i) => (
-				<text
-					key={i}
-					x={x + w / 2}
-					y={y + (big ? 38 : 32) + i * 13}
-					textAnchor="middle"
-					fill="#555"
-					fontSize="9"
-					fontFamily="monospace"
-				>
-					{line}
-				</text>
-			))}
-		</g>
-	);
-}
-
-function HexNode({
-	cx,
-	cy,
-	r,
-	color,
-	label,
-	sub,
-}: {
-	cx: number;
-	cy: number;
-	r: number;
-	color: string;
-	label: string;
-	sub: string;
-}) {
-	const pts = Array.from({ length: 6 }, (_, i) => {
-		const angle = (Math.PI / 3) * i - Math.PI / 6;
-		return `${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`;
-	}).join(" ");
-	return (
-		<g>
-			<polygon
-				points={pts}
-				fill={`${color}18`}
-				stroke={color}
-				strokeWidth="1.5"
-				strokeOpacity="0.6"
-			/>
-			<text
-				x={cx}
-				y={cy - 6}
-				textAnchor="middle"
-				fill="#E8D5A3"
-				fontSize="14"
-				fontFamily="Georgia, serif"
-				fontWeight="700"
-			>
-				{label}
-			</text>
-			<text
-				x={cx}
-				y={cy + 10}
-				textAnchor="middle"
-				fill="#555"
-				fontSize="9"
-				fontFamily="monospace"
-			>
-				{sub}
-			</text>
-			<text
-				x={cx}
-				y={cy + 22}
-				textAnchor="middle"
-				fill="#555"
-				fontSize="9"
-				fontFamily="monospace"
-			>
-				→ Claude fallback
-			</text>
-		</g>
-	);
+        {/* ── Footer ── */}
+        <footer className="border-t border-border pt-4 text-center">
+          <p className="text-[10px] text-muted-foreground font-mono">
+            by clix
+          </p>
+        </footer>
+      </main>
+    </div>
+  );
 }

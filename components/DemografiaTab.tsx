@@ -23,6 +23,8 @@ interface DemografiaTabProps {
 const SEX_COLORS: Record<string, string> = {
 	FEMENINO: "#f78166",
 	MASCULINO: "#58a6ff",
+	F: "#f78166",
+	M: "#58a6ff",
 };
 
 export default function DemografiaTab({
@@ -30,9 +32,10 @@ export default function DemografiaTab({
 	edad,
 	departamento,
 }: DemografiaTabProps) {
+	const SEX_LABEL: Record<string, string> = { F: "Femenino", M: "Masculino", X: "No especificado" };
 	const totalSexo = sexo.reduce((s, r) => s + r.casos, 0);
 	const pieData = sexo.map((s) => ({
-		name: s.sexo,
+		name: SEX_LABEL[s.sexo] ?? s.sexo,
 		value: s.casos,
 		pct: totalSexo > 0 ? Math.round((s.casos / totalSexo) * 100) : 0,
 	}));

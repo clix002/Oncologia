@@ -1,0 +1,24 @@
+{
+  "name": "@oncologia/etl",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "load-oltp": "bun run scripts/load-oltp.ts",
+    "load-sinadef": "bun run scripts/load-sinadef-v2.ts",
+    "load-ci10": "bun run scripts/load-ci10.ts",
+    "load-olap": "bun run scripts/load-olap.ts",
+    "load-mongo": "bun run scripts/load-mongo.ts",
+    "load-neo4j": "bun run scripts/load-neo4j.ts",
+    "load-tasas": "bun run scripts/load-tasas.ts",
+    "quality": "bun run scripts/quality-check.ts",
+    "all": "bun run load-ci10 && bun run load-oltp && bun run load-sinadef && bun run load-olap && bun run load-tasas && bun run load-mongo && bun run load-neo4j && bun run quality"
+  },
+  "dependencies": {
+    "@oncologia/types": "workspace:*",
+    "mongodb": "^7.2.0",
+    "neo4j-driver": "^6.0.1",
+    "papaparse": "^5.5.3",
+    "postgres": "^3.4.9",
+    "xlsx": "^0.18.5"
+  }
+}

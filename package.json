@@ -1,12 +1,26 @@
 {
-  "name": "Oncologia",
-  "version": "0.1.0",
+  "name": "oncologia-bi",
+  "version": "1.0.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "npx @biomejs/biome check app/api/ app/page.tsx app/layout.tsx app/arquitectura/ components/ lib/ etl/ db/"
+    "lint": "npx @biomejs/biome check app/api/ app/page.tsx app/layout.tsx app/arquitectura/ components/ lib/",
+    "etl": "bun run --cwd apps/etl all",
+    "etl:oltp": "bun run --cwd apps/etl load-oltp",
+    "etl:olap": "bun run --cwd apps/etl load-olap",
+    "etl:sinadef": "bun run --cwd apps/etl load-sinadef",
+    "etl:mongo": "bun run --cwd apps/etl load-mongo",
+    "etl:neo4j": "bun run --cwd apps/etl load-neo4j",
+    "services": "podman compose -f docker/podman-compose.yml up -d",
+    "services:down": "podman compose -f docker/podman-compose.yml down",
+    "dev:all": "podman compose -f docker/podman-compose.yml up -d && next dev",
+    "turbo": "turbo"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -18,7 +32,9 @@
     "drizzle-orm": "^0.45.1",
     "lucide-react": "^0.577.0",
     "next": "16.1.6",
+    "next-themes": "^0.4.6",
     "papaparse": "^5.5.3",
+    "postgres": "^3.4.9",
     "radix-ui": "^1.4.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -41,7 +57,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "turbo": "^2.5"
   },
   "ignoreScripts": [
     "sharp",
@@ -50,6 +67,7 @@
   "trustedDependencies": [
     "better-sqlite3",
     "sharp",
-    "unrs-resolver"
+    "unrs-resolver",
+    "turbo"
   ]
 }

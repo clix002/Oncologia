@@ -37,7 +37,7 @@ export default function KpiCards({ data, national, loading }: KpiCardsProps) {
 		const totalCasos = data.por_año.reduce((s, r) => s + r.casos, 0);
 		const ultimoAño = data.por_año.at(-1);
 		const totalSexo = data.sexo.reduce((s, r) => s + r.casos, 0);
-		const femenino = data.sexo.find((s) => s.sexo === "FEMENINO");
+		const femenino = data.sexo.find((s) => s.sexo === "F" || s.sexo === "FEMENINO");
 		const pctFem =
 			totalSexo > 0 && femenino
 				? Math.round((femenino.casos / totalSexo) * 100)

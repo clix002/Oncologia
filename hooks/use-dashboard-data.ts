@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { DashboardData, NationalData } from "@/lib/types";
 
 interface UseDashboardResult {
@@ -19,7 +19,25 @@ export function useDashboardData(
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
+	// Ref para evitar que fetches stale sobreescriban el estado
+	const nationalFetchId = useRef(0);
+	const dataFetchId = useRef(0);
+
+	// Nacional: solo se vuelve a fetchear si cambia `year` — nunca por región
+	useEffect(() => {
+		const id = ++nationalFetchId.current;
+		const params = year ? `?año=${year}` : "";
+		fetch(`/api/data${params}`)
+			.then((r) => r.ok ? r.json() : null)
+			.then((json) => {
+				if (json && id === nationalFetchId.current) setNational(json);
+			})
+			.catch(() => {});
+	}, [year]);
+
+	// Departamento: se fetchea cuando cambia región
 	const fetchData = useCallback(async () => {
+		const id = ++dataFetchId.current;
 		setLoading(true);
 		setError(null);
 		try {
@@ -29,26 +47,27 @@ export function useDashboardData(
 				const res = await fetch(`/api/data?${params}`);
 				if (!res.ok) throw new Error("Error cargando datos");
 				const json = await res.json();
+				if (id !== dataFetchId.current) return;
 				setData({
 					departamento: json.departamento,
 					por_año: json.por_año || [],
+					por_fuente: json.por_fuente || [],
 					sexo: json.sexo || [],
 					edad: json.edad || [],
 					provincias: json.provincias || [],
 					mensual: json.mensual || [],
+					tasas_mortalidad: json.tasas_mortalidad || [],
+					cancer_por_region: json.cancer_por_region || [],
 				});
 			} else {
-				const params = year ? `?año=${year}` : "";
-				const res = await fetch(`/api/data${params}`);
-				if (!res.ok) throw new Error("Error cargando datos");
-				const json = await res.json();
-				setNational(json);
+				if (id !== dataFetchId.current) return;
 				setData(null);
 			}
 		} catch (e) {
-			setError(e instanceof Error ? e.message : "Error desconocido");
+			if (id === dataFetchId.current)
+				setError(e instanceof Error ? e.message : "Error desconocido");
 		} finally {
-			setLoading(false);
+			if (id === dataFetchId.current) setLoading(false);
 		}
 	}, [region, year]);
 

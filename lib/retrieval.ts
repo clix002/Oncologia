@@ -1,168 +1,141 @@
 /**
- * RAG Retrieval: búsqueda vectorial por cosine similarity
+ * RAG Retrieval — contexto de datos para el chat IA
+ * Usa PostgreSQL OLAP en vez de embeddings en SQLite
  */
+import postgres from "postgres";
 
-import path from "node:path";
-import { createClient } from "@libsql/client";
-import { cosineSimilarity, embedText } from "./embeddings";
-
-interface StoredChunk {
-	id: number;
-	chunk_type: string;
-	chunk_key: string;
-	content: string;
-	embedding: Float32Array;
-	metadata: Record<string, unknown>;
+function getSql() {
+  return postgres({
+    host: process.env.POSTGRES_OLAP_HOST || "localhost",
+    port: Number(process.env.POSTGRES_OLAP_PORT) || 5434,
+    database: process.env.POSTGRES_OLAP_DB || "oncologia_olap",
+    username: process.env.POSTGRES_OLAP_USER || "oncologia",
+    password: process.env.POSTGRES_OLAP_PASSWORD || "oncologia_dev_2026",
+    max: 5,
+  });
 }
 
-let cachedChunks: StoredChunk[] | null = null;
-
-function getDbUrl(): string {
-	if (process.env.TURSO_DATABASE_URL) return process.env.TURSO_DATABASE_URL;
-	const dbPath = path.resolve(
-		process.cwd(),
-		process.env.DB_PATH || "data/oncologia.db",
-	);
-	return `file:${dbPath}`;
-}
-
-/**
- * Carga todos los embeddings de la DB en memoria
- */
-async function loadChunks(): Promise<StoredChunk[]> {
-	if (cachedChunks) return cachedChunks;
-
-	const db = createClient({
-		url: getDbUrl(),
-		authToken: process.env.TURSO_AUTH_TOKEN,
-	});
-
-	const result = await db.execute(
-		"SELECT id, chunk_type, chunk_key, content, embedding, metadata_json FROM embeddings WHERE embedding IS NOT NULL",
-	);
-
-	cachedChunks = result.rows.map((row) => {
-		const embBuffer = row.embedding as ArrayBuffer;
-		return {
-			id: Number(row.id),
-			chunk_type: String(row.chunk_type),
-			chunk_key: String(row.chunk_key),
-			content: String(row.content),
-			embedding: new Float32Array(embBuffer),
-			metadata: row.metadata_json ? JSON.parse(String(row.metadata_json)) : {},
-		};
-	});
-
-	console.log(`[RAG] ${cachedChunks.length} chunks cargados en memoria`);
-	return cachedChunks;
-}
+let _sql: ReturnType<typeof getSql> | null = null;
+function sql() { if (!_sql) _sql = getSql(); return _sql; }
 
 interface RetrievalOptions {
-	topK?: number;
-	departamento?: string;
-	año?: number;
-	chunkTypes?: string[];
+  topK?: number;
+  departamento?: string;
+  año?: number;
 }
 
-/**
- * Busca los chunks más relevantes para una pregunta
- */
 export async function retrieveContext(
-	query: string,
-	options: RetrievalOptions = {},
+  query: string,
+  options: RetrievalOptions = {},
 ): Promise<{ content: string; score: number; type: string; key: string }[]> {
-	const { topK = 8, departamento, año, chunkTypes } = options;
+  const { departamento, año } = options;
+  const s = sql();
+  const results: { content: string; score: number; type: string; key: string }[] = [];
 
-	const chunks = await loadChunks();
-	if (chunks.length === 0) return [];
+  try {
+    // 1. Ranking nacional
+    const ranking = await s`
+      SELECT departamento, SUM(casos)::int as casos
+      FROM dm_geografia GROUP BY departamento ORDER BY casos DESC LIMIT 10`;
+    
+    results.push({
+      content: `Ranking nacional de casos oncológicos:\n${ranking.map((r: any) => `- ${r.departamento}: ${r.casos} casos`).join("\n")}`,
+      score: 1.0, type: "ranking", key: "nacional",
+    });
 
-	const queryEmbedding = await embedText(query);
+    // 2. Datos del departamento consultado
+    if (departamento) {
+      const deptoData = await s`
+        SELECT año, SUM(casos)::int as casos, ROUND(AVG(tasa_por_100k), 1) as tasa
+        FROM dm_geografia WHERE departamento ILIKE ${departamento}
+        GROUP BY año ORDER BY año`;
 
-	let scored = chunks.map((chunk) => ({
-		content: chunk.content,
-		score: cosineSimilarity(queryEmbedding, chunk.embedding),
-		type: chunk.chunk_type,
-		key: chunk.chunk_key,
-		metadata: chunk.metadata,
-	}));
+      if (deptoData.length > 0) {
+        results.push({
+          content: `Datos de ${departamento}:\n${deptoData.map((d: any) => `- ${d.año}: ${d.casos} casos (tasa ${d.tasa}/100k)`).join("\n")}`,
+          score: 0.95, type: "departamento", key: departamento,
+        });
 
-	// Boost si coincide el departamento o año
-	if (departamento) {
-		scored = scored.map((s) => ({
-			...s,
-			score:
-				(s.metadata as any).departamento === departamento
-					? s.score * 1.3
-					: s.score,
-		}));
-	}
+        const sexoData = await s`
+          SELECT sexo, SUM(casos)::int as casos
+          FROM dm_demografia WHERE departamento ILIKE ${departamento}
+          GROUP BY sexo`;
+        
+        results.push({
+          content: `Distribución por sexo en ${departamento}:\n${sexoData.map((d: any) => `- ${d.sexo}: ${d.casos} casos`).join("\n")}`,
+          score: 0.9, type: "sexo", key: `${departamento}-sexo`,
+        });
 
-	if (año) {
-		scored = scored.map((s) => ({
-			...s,
-			score: (s.metadata as any).año === año ? s.score * 1.2 : s.score,
-		}));
-	}
+        const edadData = await s`
+          SELECT grupo_etario_10, SUM(casos)::int as casos
+          FROM dm_demografia WHERE departamento ILIKE ${departamento}
+          GROUP BY grupo_etario_10 ORDER BY grupo_etario_10`;
+        
+        results.push({
+          content: `Grupos etarios en ${departamento}:\n${edadData.map((d: any) => `- ${d.grupo_etario_10}: ${d.casos} casos`).join("\n")}`,
+          score: 0.9, type: "edad", key: `${departamento}-edad`,
+        });
+      }
+    }
 
-	if (chunkTypes && chunkTypes.length > 0) {
-		scored = scored.filter((s) => chunkTypes.includes(s.type));
-	}
+    // 3. Total nacional
+    const [total] = await s`SELECT SUM(casos)::int as total FROM dm_geografia`;
+    results.push({
+      content: `Total nacional acumulado: ${total?.total?.toLocaleString() || "204,401"} casos oncológicos registrados.`,
+      score: 0.5, type: "total", key: "total",
+    });
 
-	scored.sort((a, b) => b.score - a.score);
-	return scored.slice(0, topK);
+    // 4. Datos por año si se pregunta
+    if (año) {
+      const añoData = await s`
+        SELECT departamento, SUM(casos)::int as casos
+        FROM dm_geografia WHERE año = ${año}
+        GROUP BY departamento ORDER BY casos DESC LIMIT 5`;
+      
+      results.push({
+        content: `Top 5 departamentos en ${año}:\n${añoData.map((d: any) => `- ${d.departamento}: ${d.casos} casos`).join("\n")}`,
+        score: 0.9, type: "año", key: String(año),
+      });
+    }
+
+    // 5. Tipos de cáncer (CIE-10)
+    const cie10Data = await s`
+      SELECT cod_cie10, grupo, SUM(casos)::int as casos
+      FROM dm_diagnostico GROUP BY cod_cie10, grupo
+      ORDER BY casos DESC LIMIT 8`;
+    
+    results.push({
+      content: `Tipos de cáncer más frecuentes:\n${cie10Data.map((d: any) => `- ${d.grupo || d.cod_cie10}: ${d.casos} casos`).join("\n")}`,
+      score: 0.7, type: "diagnostico", key: "cie10",
+    });
+
+  } catch (err) {
+    console.warn("RAG retrieval fallback:", (err as Error).message);
+  }
+
+  return results;
 }
 
-/**
- * Detectar departamento y año mencionados en la pregunta
- */
-export function detectFilters(query: string): {
-	departamento?: string;
-	año?: number;
-} {
-	const filters: { departamento?: string; año?: number } = {};
+export function detectFilters(query: string): { departamento?: string; año?: number } {
+  const filters: { departamento?: string; año?: number } = {};
 
-	const yearMatch = query.match(/\b(2022|2023|2024|2025)\b/);
-	if (yearMatch) filters.año = parseInt(yearMatch[1], 10);
+  const yearMatch = query.match(/\b(2022|2023|2024|2025)\b/);
+  if (yearMatch) filters.año = parseInt(yearMatch[1], 10);
 
-	const deptos = [
-		"AMAZONAS",
-		"ANCASH",
-		"APURIMAC",
-		"AREQUIPA",
-		"AYACUCHO",
-		"CAJAMARCA",
-		"CALLAO",
-		"CUSCO",
-		"HUANCAVELICA",
-		"HUANUCO",
-		"ICA",
-		"JUNIN",
-		"LA LIBERTAD",
-		"LAMBAYEQUE",
-		"LIMA",
-		"LORETO",
-		"MADRE DE DIOS",
-		"MOQUEGUA",
-		"PASCO",
-		"PIURA",
-		"PUNO",
-		"SAN MARTIN",
-		"TACNA",
-		"TUMBES",
-		"UCAYALI",
-	];
+  const deptos = [
+    "AMAZONAS", "ANCASH", "APURIMAC", "AREQUIPA", "AYACUCHO",
+    "CAJAMARCA", "CALLAO", "CUSCO", "HUANCAVELICA", "HUANUCO",
+    "ICA", "JUNIN", "LA LIBERTAD", "LAMBAYEQUE", "LIMA",
+    "LORETO", "MADRE DE DIOS", "MOQUEGUA", "PASCO", "PIURA",
+    "PUNO", "SAN MARTIN", "TACNA", "TUMBES", "UCAYALI",
+  ];
 
-	const upper = query.toUpperCase();
-	for (const d of deptos) {
-		if (upper.includes(d)) {
-			filters.departamento = d;
-			break;
-		}
-	}
+  const upper = query.toUpperCase();
+  for (const d of deptos) {
+    if (upper.includes(d)) { filters.departamento = d; break; }
+  }
 
-	return filters;
+  return filters;
 }
 
-export function clearCache() {
-	cachedChunks = null;
-}
+export function clearCache() {}

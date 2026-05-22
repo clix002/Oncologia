@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -30,8 +30,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files
+.env
+.env.local
+.env.*.local
+!.env.example
 
 # vercel
 .vercel
@@ -47,10 +50,24 @@ next-env.d.ts
 
 # documentation (LaTeX)
 /docs/
+
+# docker
+docker/.env
+!docker/.env.example
+docker/data/
+
 # Claude / AI tooling — no subir
 CLAUDE.md
 .claudes
 skills-lock.json
 .agents/
 .claude/
-.interface-design/
+docker/etl-service/.env
+
+# raw data — archivos grandes, no subir a git
+db/oncologia/raw-sisa/
+db/oncologia/raw-sinadef/
+db/oncologia/raw-inen/
+db/oncologia/raw-inei/
+db/oncologia/raw-dpcan/
+db/oncologia/raw-tasas/

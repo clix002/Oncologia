@@ -46,7 +46,7 @@ export default function MapSidebar({
 			<Separator className="my-2" />
 
 			{national && (
-				<div className="mb-4">
+		<div className="mb-4 sticky top-0 bg-card pt-0 pb-2 z-10">
 					<p className="font-mono text-xs text-muted-foreground uppercase tracking-wider mb-1">
 						Total nacional
 					</p>

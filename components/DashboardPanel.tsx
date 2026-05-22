@@ -3,11 +3,12 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { DashboardData, NationalData, RankingDepto } from "@/lib/types";
-import ChatTab from "./ChatTab";
 import DemografiaTab from "./DemografiaTab";
 import KpiCards from "./KpiCards";
 import ProvinciasTab from "./ProvinciasTab";
 import TendenciaTab from "./TendenciaTab";
+import PredictionTab from "./PredictionTab";
+import CancerRegionTab from "./CancerRegionTab";
 
 interface DashboardPanelProps {
 	data: DashboardData | null;
@@ -20,7 +21,6 @@ export default function DashboardPanel({
 	data,
 	national,
 	loading,
-	selectedRegion,
 }: DashboardPanelProps) {
 	const departamento = data?.departamento || "PERÚ";
 	const hasRegionData = !!data && data.por_año.length > 0;
@@ -58,10 +58,18 @@ export default function DashboardPanel({
 							Provincias
 						</TabsTrigger>
 						<TabsTrigger
-							value="chat"
+							value="predicciones"
 							className="data-[state=active]:bg-card data-[state=active]:text-primary text-xs font-mono"
+							disabled={!hasRegionData}
 						>
-							Chat IA
+							Predicciones
+						</TabsTrigger>
+						<TabsTrigger
+							value="tipos"
+							className="data-[state=active]:bg-card data-[state=active]:text-primary text-xs font-mono"
+							disabled={!hasRegionData}
+						>
+							Tipos
 						</TabsTrigger>
 					</TabsList>
 
@@ -96,16 +104,31 @@ export default function DashboardPanel({
 						)}
 					</TabsContent>
 
-					<TabsContent value="chat" className="mt-4">
-						<ChatTab region={selectedRegion} />
-					</TabsContent>
+				<TabsContent value="predicciones" className="mt-4">
+					{hasRegionData && (
+						<PredictionTab
+							porAnio={data.por_año}
+							porFuente={data.por_fuente || []}
+							departamento={departamento}
+							tasasMortalidad={data.tasas_mortalidad}
+						/>
+					)}
+				</TabsContent>
+
+				<TabsContent value="tipos" className="mt-4">
+					{hasRegionData && (
+						<CancerRegionTab
+							datos={data.cancer_por_region || []}
+							departamento={departamento}
+						/>
+					)}
+				</TabsContent>
 				</Tabs>
 			)}
 		</div>
 	);
 }
 
-/** Vista nacional: ranking de departamentos como barra horizontal */
 function NationalTendencia({ ranking }: { ranking: RankingDepto[] }) {
 	const max = Math.max(...ranking.map((r) => r.casos), 1);
 	const top15 = ranking.slice(0, 15);
