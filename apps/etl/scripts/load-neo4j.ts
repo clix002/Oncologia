@@ -1,8 +1,12 @@
 /**
  * load-neo4j.ts — Puebla Neo4j con Grafo de Conocimiento Oncológico
  *
- * Nodos: Departamento, Provincia, Paciente, TipoCancer
- * Relaciones: RESIDE_EN, DIAGNOSTICADO_CON, TIENE_INCIDENCIA, ATENDIDO_EN
+ * Nodos: Departamento, Provincia, Paciente, TipoCancer, FactorRiesgo
+ * Relaciones: RESIDE_EN, PERTENECE_A, DIAGNOSTICADO_CON, TIENE_INCIDENCIA, PRESENTA_FACTOR
+ *
+ * Fuentes:
+ *  - INEN (66k): uuid_hash real, sexo, departamento — sin CIE-10
+ *  - SINADEF (140k): uuid_hash real, sexo, departamento, CIE-10 real
  */
 import neo4j from "neo4j-driver";
 import postgres from "postgres";
@@ -15,13 +19,24 @@ const driver = neo4j.driver(
   )
 );
 
-const sql = postgres({
+const oltp = postgres({
   host: process.env.POSTGRES_OLTP_HOST || "localhost",
   port: Number(process.env.POSTGRES_OLTP_PORT) || 5433,
   database: process.env.POSTGRES_OLTP_DB || "oncologia_oltp",
   username: process.env.POSTGRES_OLTP_USER || "oncologia",
   password: process.env.POSTGRES_OLTP_PASSWORD || "oncologia_dev_2026",
   max: 5,
+  idle_timeout: 120,
+});
+
+const olap = postgres({
+  host: process.env.POSTGRES_OLAP_HOST || "localhost",
+  port: Number(process.env.POSTGRES_OLAP_PORT) || 5434,
+  database: process.env.POSTGRES_OLAP_DB || "oncologia_olap",
+  username: process.env.POSTGRES_OLAP_USER || "oncologia",
+  password: process.env.POSTGRES_OLAP_PASSWORD || "oncologia_dev_2026",
+  max: 5,
+  idle_timeout: 120,
 });
 
 const DEPTO_ZONAS: Record<string, string> = {
@@ -42,6 +57,14 @@ const FACTORES_RIESGO: Record<string, string[]> = {
   "SELVA": ["tabaquismo", "falta_acceso_salud", "desnutricion", "infecciones_endemicas"],
 };
 
+const BATCH = 1000;
+
+async function runBatch(session: ReturnType<typeof driver.session>, query: string, rows: object[]) {
+  for (let i = 0; i < rows.length; i += BATCH) {
+    await session.run(query, { batch: rows.slice(i, i + BATCH) });
+  }
+}
+
 async function main() {
   console.log("╔══════════════════════════════════════════╗");
   console.log("║  FASE 5: Neo4j — Grafo de Conocimiento   ║");
@@ -54,181 +77,228 @@ async function main() {
   await session.run("MATCH (n) DETACH DELETE n");
   console.log("   Grafo limpio\n");
 
+  // ── Constraints e índices ──
+  await session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (d:Departamento) REQUIRE d.nombre IS UNIQUE").catch(() => {});
+  await session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (p:Paciente) REQUIRE p.hash IS UNIQUE").catch(() => {});
+  await session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (t:TipoCancer) REQUIRE t.cod_cie10 IS UNIQUE").catch(() => {});
+  await session.run("CREATE INDEX IF NOT EXISTS FOR (p:Paciente) ON (p.departamento)").catch(() => {});
+
   // ── 1. Nodos: Departamento ──
   console.log("🗺️  Creando nodos Departamento...");
-  const deptos = Object.keys(DEPTO_ZONAS);
+  await runBatch(session,
+    `UNWIND $batch AS row
+     MERGE (d:Departamento {nombre: row.nombre})
+     SET d.zona = row.zona`,
+    Object.entries(DEPTO_ZONAS).map(([nombre, zona]) => ({ nombre, zona }))
+  );
+  console.log(`   ${Object.keys(DEPTO_ZONAS).length} departamentos\n`);
 
-  for (const depto of deptos) {
-    await session.run(
-      `MERGE (d:Departamento {nombre: $nombre})
-       SET d.zona = $zona`,
-      { nombre: depto, zona: DEPTO_ZONAS[depto] }
-    );
-  }
-
-  // ── Nodos: Provincia ──
-  console.log("   Creando nodos Provincia...");
-  const provincias = await sql`
-    SELECT DISTINCT departamento, provincia FROM establecimiento
-    WHERE departamento != 'DESCONOCIDO' AND provincia != 'DESCONOCIDO'
+  // ── 2. Nodos: Provincia — desde paciente.departamento/provincia ──
+  console.log("🏙️  Creando nodos Provincia...");
+  const provincias = await oltp`
+    SELECT DISTINCT
+      UPPER(departamento) AS departamento,
+      UPPER(provincia)    AS provincia
+    FROM paciente
+    WHERE departamento IS NOT NULL
+      AND provincia IS NOT NULL
+      AND departamento != ''
+      AND provincia != ''
+      AND departamento != 'DESCONOCIDO'
+      AND provincia != 'DESCONOCIDO'
     ORDER BY departamento, provincia
-    LIMIT 200
   `;
 
-  for (const p of provincias) {
-    await session.run(
-      `MERGE (prov:Provincia {nombre: $nombre, departamento: $depto})
-       WITH prov
-       MATCH (d:Departamento {nombre: $depto})
-       MERGE (prov)-[:PERTENECE_A]->(d)`,
-      { nombre: String(p.provincia).toUpperCase(), depto: String(p.departamento).toUpperCase() }
-    );
-  }
+  await runBatch(session,
+    `UNWIND $batch AS row
+     MERGE (prov:Provincia {nombre: row.provincia, departamento: row.departamento})
+     WITH prov, row
+     MATCH (d:Departamento {nombre: row.departamento})
+     MERGE (prov)-[:PERTENECE_A]->(d)`,
+    provincias.map(p => ({ departamento: String(p.departamento), provincia: String(p.provincia) }))
+  );
   console.log(`   ${provincias.length} provincias\n`);
 
-  // ── 2. Nodos: TipoCancer ──
+  // ── 3. Nodos: TipoCancer — desde dim_diagnostico OLAP ──
   console.log("🧬 Creando nodos TipoCancer...");
-  const canceres = await sql`
-    SELECT cod_cie10, nombre, grupo FROM tipo_diagnostico WHERE es_oncologico = TRUE ORDER BY cod_cie10
+  const canceres = await olap`
+    SELECT cod_cie10, nombre, grupo FROM dim_diagnostico ORDER BY cod_cie10
   `;
 
-  for (const c of canceres) {
-    await session.run(
-      `MERGE (t:TipoCancer {cod_cie10: $cod})
-       SET t.nombre = $nombre, t.grupo = $grupo`,
-      { cod: String(c.cod_cie10), nombre: String(c.nombre), grupo: String(c.grupo || "OTROS") }
-    );
-  }
+  await runBatch(session,
+    `UNWIND $batch AS row
+     MERGE (t:TipoCancer {cod_cie10: row.cod})
+     SET t.nombre = row.nombre, t.grupo = row.grupo`,
+    canceres.map(c => ({ cod: String(c.cod_cie10), nombre: String(c.nombre || c.cod_cie10), grupo: String(c.grupo || "OTROS") }))
+  );
   console.log(`   ${canceres.length} tipos de cáncer\n`);
 
-  // ── 3. Nodos: Paciente (muestra) ──
-  console.log("👤 Creando nodos Paciente (muestra)...");
-  const pacientes = await sql`
-    SELECT p.id, p.uuid_hash, p.sexo, e.departamento, e.provincia
-    FROM paciente p
-    JOIN atencion a ON a.paciente_id = p.id
-    JOIN establecimiento e ON a.establecimiento_id = e.id
-    WHERE p.uuid_hash NOT LIKE 'SINADEF-%'
-    LIMIT 5000
-  `;
+  // ── 4. FactorRiesgo ──
+  console.log("⚠️  Creando nodos FactorRiesgo...");
+  const factorRows: { nombre: string; zona: string }[] = [];
+  for (const [zona, factores] of Object.entries(FACTORES_RIESGO)) {
+    for (const f of factores) factorRows.push({ nombre: f, zona });
+  }
 
-  let pacCount = 0;
-  for (const p of pacientes) {
+  await runBatch(session,
+    `UNWIND $batch AS row
+     MERGE (f:FactorRiesgo {nombre: row.nombre})
+     WITH f, row
+     MATCH (d:Departamento {zona: row.zona})
+     MERGE (d)-[:PRESENTA_FACTOR]->(f)`,
+    factorRows
+  );
+  console.log(`   ${factorRows.length} factores de riesgo enlazados\n`);
+
+  // ── 5. Pacientes SINADEF — todos, con CIE-10 real ──
+  console.log("👤 Cargando pacientes SINADEF con diagnóstico...");
+  let offset = 0;
+  let sinCount = 0;
+
+  while (true) {
+    const rows = await oltp`
+      SELECT p.uuid_hash, p.sexo,
+             UPPER(COALESCE(p.departamento, 'DESCONOCIDO')) AS departamento,
+             UPPER(COALESCE(p.provincia, 'DESCONOCIDO'))    AS provincia,
+             d.cod_cie10,
+             TO_CHAR(d.fecha_diagnostico, 'YYYY-MM-DD')     AS fecha_dx
+      FROM paciente p
+      JOIN diagnostico d ON d.paciente_id = p.id
+      WHERE p.uuid_hash LIKE 'SINADEF-%'
+      ORDER BY p.id
+      LIMIT ${BATCH} OFFSET ${offset}
+    `;
+    if (rows.length === 0) break;
+
+    // Crear nodos Paciente
     await session.run(
-      `MERGE (pac:Paciente {hash: $hash})
-       SET pac.sexo = $sexo`,
-      { hash: String(p.uuid_hash), sexo: String(p.sexo) }
+      `UNWIND $batch AS row
+       MERGE (pac:Paciente {hash: row.hash})
+       SET pac.sexo = row.sexo, pac.fuente = 'SINADEF',
+           pac.departamento = row.departamento`,
+      { batch: rows.map(r => ({ hash: String(r.uuid_hash), sexo: String(r.sexo), departamento: String(r.departamento) })) }
     );
 
     // Relación RESIDE_EN
-    const depto = String(p.departamento || "DESCONOCIDO").toUpperCase();
-    if (DEPTO_ZONAS[depto]) {
+    const conDepto = rows.filter(r => DEPTO_ZONAS[String(r.departamento)]);
+    if (conDepto.length > 0) {
       await session.run(
-        `MATCH (pac:Paciente {hash: $hash})
-         MATCH (d:Departamento {nombre: $depto})
+        `UNWIND $batch AS row
+         MATCH (pac:Paciente {hash: row.hash})
+         MATCH (d:Departamento {nombre: row.departamento})
          MERGE (pac)-[:RESIDE_EN]->(d)`,
-        { hash: String(p.uuid_hash), depto }
+        { batch: conDepto.map(r => ({ hash: String(r.uuid_hash), departamento: String(r.departamento) })) }
       );
     }
 
-    pacCount++;
-    if (pacCount % 1000 === 0) console.log(`   ${pacCount} pacientes...`);
-  }
-  console.log(`   ${pacCount} pacientes (muestra)\n`);
-
-  // ── 4. Relaciones: DIAGNOSTICADO_CON ──
-  console.log("🔗 Creando relaciones DIAGNOSTICADO_CON...");
-
-  const diagnosticos = await sql`
-    SELECT p.uuid_hash, d.cod_cie10, d.fecha_diagnostico
-    FROM diagnostico d
-    JOIN paciente p ON d.paciente_id = p.id
-    WHERE p.uuid_hash LIKE 'SINADEF-%'
-    LIMIT 10000
-  `;
-
-  let diagRelCount = 0;
-  for (const d of diagnosticos) {
-    const hash = `SINADEF-pac-${d.uuid_hash}`;
-    await session.run(
-      `MERGE (pac:Paciente {hash: $hash})
-       WITH pac
-       MATCH (t:TipoCancer {cod_cie10: $cod})
-       MERGE (pac)-[:DIAGNOSTICADO_CON {fecha: $fecha}]->(t)`,
-      { hash, cod: String(d.cod_cie10), fecha: String(d.fecha_diagnostico || "2023-01-01") }
-    );
-    diagRelCount++;
-    if (diagRelCount % 2000 === 0) console.log(`   ${diagRelCount} relaciones...`);
-  }
-  console.log(`   ${diagRelCount} relaciones DIAGNOSTICADO_CON\n`);
-
-  // ── 5. Relaciones: TIENE_INCIDENCIA ──
-  console.log("📊 Creando relaciones TIENE_INCIDENCIA...");
-
-  const incidencias = await sql`
-    SELECT e.departamento, COUNT(*)::int as casos
-    FROM atencion a
-    JOIN establecimiento e ON a.establecimiento_id = e.id
-    WHERE e.departamento != 'DESCONOCIDO'
-    GROUP BY e.departamento
-    ORDER BY casos DESC
-  `;
-
-  for (const inc of incidencias) {
-    const depto = String(inc.departamento).toUpperCase();
-    if (!DEPTO_ZONAS[depto]) continue;
-
-    // Vincular con TipoCancer más frecuente (usamos genérico)
-    await session.run(
-      `MATCH (d:Departamento {nombre: $depto})
-       MATCH (t:TipoCancer {cod_cie10: 'C50'})
-       MERGE (d)-[:TIENE_INCIDENCIA {casos: $casos, tipo: 'mama'}]->(t)`,
-      { depto, casos: Number(inc.casos) }
-    );
-  }
-  console.log(`   ${incidencias.length} relaciones de incidencia\n`);
-
-  // ── 6. Nodos: FactorRiesgo ──
-  console.log("⚠️  Creando nodos FactorRiesgo...");
-
-  for (const [depto, factores] of Object.entries(FACTORES_RIESGO)) {
-    for (const factor of factores) {
+    // Relación DIAGNOSTICADO_CON
+    const conCie = rows.filter(r => r.cod_cie10);
+    if (conCie.length > 0) {
       await session.run(
-        `MERGE (f:FactorRiesgo {nombre: $nombre})
-         WITH f
-         MATCH (d:Departamento {zona: $zona})
-         MERGE (d)-[:PRESENTA_FACTOR]->(f)`,
-        { nombre: factor, zona: depto }
+        `UNWIND $batch AS row
+         MATCH (pac:Paciente {hash: row.hash})
+         MATCH (t:TipoCancer {cod_cie10: row.cod})
+         MERGE (pac)-[:DIAGNOSTICADO_CON {fecha: row.fecha}]->(t)`,
+        { batch: conCie.map(r => ({ hash: String(r.uuid_hash), cod: String(r.cod_cie10), fecha: String(r.fecha_dx || "2023-01-01") })) }
       );
     }
-  }
 
-  // ── 7. Resumen ──
-  console.log("\n╔══════════════════════════════════════════╗");
+    sinCount += rows.length;
+    offset += BATCH;
+    process.stdout.write(`\r   SINADEF: ${sinCount.toLocaleString()} pacientes...`);
+  }
+  console.log(`\n   ${sinCount.toLocaleString()} pacientes SINADEF cargados\n`);
+
+  // ── 6. Pacientes INEN — todos, sin CIE-10 ──
+  console.log("👤 Cargando pacientes INEN...");
+  offset = 0;
+  let inenCount = 0;
+
+  while (true) {
+    const rows = await oltp`
+      SELECT uuid_hash, sexo,
+             UPPER(COALESCE(departamento, 'DESCONOCIDO')) AS departamento
+      FROM paciente
+      WHERE uuid_hash NOT LIKE 'SINADEF-%'
+      ORDER BY id
+      LIMIT ${BATCH} OFFSET ${offset}
+    `;
+    if (rows.length === 0) break;
+
+    await session.run(
+      `UNWIND $batch AS row
+       MERGE (pac:Paciente {hash: row.hash})
+       SET pac.sexo = row.sexo, pac.fuente = 'INEN',
+           pac.departamento = row.departamento`,
+      { batch: rows.map(r => ({ hash: String(r.uuid_hash), sexo: String(r.sexo), departamento: String(r.departamento) })) }
+    );
+
+    const conDepto = rows.filter(r => DEPTO_ZONAS[String(r.departamento)]);
+    if (conDepto.length > 0) {
+      await session.run(
+        `UNWIND $batch AS row
+         MATCH (pac:Paciente {hash: row.hash})
+         MATCH (d:Departamento {nombre: row.departamento})
+         MERGE (pac)-[:RESIDE_EN]->(d)`,
+        { batch: conDepto.map(r => ({ hash: String(r.uuid_hash), departamento: String(r.departamento) })) }
+      );
+    }
+
+    inenCount += rows.length;
+    offset += BATCH;
+    process.stdout.write(`\r   INEN: ${inenCount.toLocaleString()} pacientes...`);
+  }
+  console.log(`\n   ${inenCount.toLocaleString()} pacientes INEN cargados\n`);
+
+  // ── 7. TIENE_INCIDENCIA — desde OLAP: casos por depto y tipo de cáncer ──
+  console.log("📊 Creando relaciones TIENE_INCIDENCIA...");
+  const incidencias = await olap`
+    SELECT g.departamento, dg.cod_cie10, COUNT(*)::int AS casos
+    FROM fact_oncologia f
+    JOIN dim_geografia g ON f.geografia_id = g.id
+    JOIN dim_diagnostico dg ON f.diagnostico_id = dg.id
+    WHERE g.departamento != 'DESCONOCIDO'
+      AND f.diagnostico_id IS NOT NULL
+    GROUP BY g.departamento, dg.cod_cie10
+    ORDER BY casos DESC
+    LIMIT 500
+  `;
+
+  await runBatch(session,
+    `UNWIND $batch AS row
+     MATCH (d:Departamento {nombre: row.depto})
+     MATCH (t:TipoCancer {cod_cie10: row.cod})
+     MERGE (d)-[r:TIENE_INCIDENCIA {cod_cie10: row.cod}]->(t)
+     SET r.casos = row.casos`,
+    incidencias
+      .filter(r => DEPTO_ZONAS[String(r.departamento)])
+      .map(r => ({ depto: String(r.departamento), cod: String(r.cod_cie10), casos: Number(r.casos) }))
+  );
+  console.log(`   ${incidencias.length} relaciones TIENE_INCIDENCIA\n`);
+
+  // ── Resumen ──
+  console.log("╔══════════════════════════════════════════╗");
   console.log("║         RESUMEN Neo4j                    ║");
   console.log("╚══════════════════════════════════════════╝");
 
-  const counts: Record<string, string> = {
-    "Departamento": "MATCH (n:Departamento) RETURN COUNT(n) as c",
-    "Provincia": "MATCH (n:Provincia) RETURN COUNT(n) as c",
-    "Paciente": "MATCH (n:Paciente) RETURN COUNT(n) as c",
-    "TipoCancer": "MATCH (n:TipoCancer) RETURN COUNT(n) as c",
-    "FactorRiesgo": "MATCH (n:FactorRiesgo) RETURN COUNT(n) as c",
-    "RESIDE_EN": "MATCH ()-[r:RESIDE_EN]->() RETURN COUNT(r) as c",
-    "DIAGNOSTICADO_CON": "MATCH ()-[r:DIAGNOSTICADO_CON]->() RETURN COUNT(r) as c",
-    "TIENE_INCIDENCIA": "MATCH ()-[r:TIENE_INCIDENCIA]->() RETURN COUNT(r) as c",
-    "PRESENTA_FACTOR": "MATCH ()-[r:PRESENTA_FACTOR]->() RETURN COUNT(r) as c",
-    "PERTENECE_A": "MATCH ()-[r:PERTENECE_A]->() RETURN COUNT(r) as c",
+  const queries: Record<string, string> = {
+    "Departamento":        "MATCH (n:Departamento) RETURN COUNT(n) as c",
+    "Provincia":           "MATCH (n:Provincia) RETURN COUNT(n) as c",
+    "Paciente":            "MATCH (n:Paciente) RETURN COUNT(n) as c",
+    "TipoCancer":          "MATCH (n:TipoCancer) RETURN COUNT(n) as c",
+    "FactorRiesgo":        "MATCH (n:FactorRiesgo) RETURN COUNT(n) as c",
+    "RESIDE_EN":           "MATCH ()-[r:RESIDE_EN]->() RETURN COUNT(r) as c",
+    "DIAGNOSTICADO_CON":   "MATCH ()-[r:DIAGNOSTICADO_CON]->() RETURN COUNT(r) as c",
+    "TIENE_INCIDENCIA":    "MATCH ()-[r:TIENE_INCIDENCIA]->() RETURN COUNT(r) as c",
+    "PRESENTA_FACTOR":     "MATCH ()-[r:PRESENTA_FACTOR]->() RETURN COUNT(r) as c",
+    "PERTENECE_A":         "MATCH ()-[r:PERTENECE_A]->() RETURN COUNT(r) as c",
   };
 
-  for (const [label, query] of Object.entries(counts)) {
-    try {
-      const result = await session.run(query);
-      const count = result.records[0]?.get("c")?.toNumber?.() ?? result.records[0]?.get("c");
-      console.log(`   ${label}: ${typeof count === 'bigint' ? count.toString() : count}`);
-    } catch {
-      console.log(`   ${label}: ❌`);
-    }
+  for (const [label, q] of Object.entries(queries)) {
+    const result = await session.run(q);
+    const c = result.records[0]?.get("c");
+    const val = typeof c?.toNumber === "function" ? c.toNumber() : Number(c);
+    console.log(`   ${label}: ${val.toLocaleString()}`);
   }
 
   await session.close();
@@ -236,5 +306,5 @@ async function main() {
 }
 
 main()
-  .then(() => { driver.close(); sql.end(); process.exit(0); })
-  .catch((err) => { console.error("❌", err); driver.close(); sql.end(); process.exit(1); });
+  .then(() => { driver.close(); oltp.end(); olap.end(); process.exit(0); })
+  .catch((err) => { console.error("❌", err); driver.close(); oltp.end(); olap.end(); process.exit(1); });

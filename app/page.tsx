@@ -35,7 +35,11 @@ export default function Home() {
 
 	const { data, national, loading } = useDashboardData(selectedRegion);
 
-	const colorMap = national?.ranking ? buildColorMap(national.ranking) : {};
+	// Solo pasar colorMap cuando hay región seleccionada — sin región, el mapa
+	// usa ZONE_COLORS (Costa/Sierra/Selva) definidos en PeruPaths
+	const colorMap = selectedRegion && national?.ranking
+		? buildColorMap(national.ranking)
+		: {};
 
 	const handleRegionEnter = (e: MouseEvent<SVGPathElement>, name: string) => {
 		setTooltip({ x: e.clientX, y: e.clientY, name });
@@ -52,6 +56,7 @@ export default function Home() {
 			<Topbar
 				selectedRegion={selectedRegion}
 				onClearRegion={() => setSelectedRegion(null)}
+				departamento={data?.departamento ?? "PERÚ"}
 			/>
 
 			<div className="flex-1 grid grid-cols-1 md:grid-cols-[240px_1fr_1fr] overflow-hidden">

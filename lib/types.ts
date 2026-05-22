@@ -3,6 +3,12 @@ export interface CasosPorAnio {
 	casos: number;
 }
 
+export interface CasosPorAnioFuente {
+	año: number;
+	fuente: string;
+	casos: number;
+}
+
 export interface DistribucionSexo {
 	sexo: string;
 	casos: number;
@@ -28,13 +34,30 @@ export interface RankingDepto {
 	casos: number;
 }
 
+export interface TasaMortalidad {
+	año: number;
+	sexo: "Hombre" | "Mujer" | "Total";
+	ndefun: number;
+	tasa_bruta: number | null;
+	tasa_ajust: number | null;
+}
+
+export interface CancerPorRegion {
+	cod_cie10: string;
+	tipo: string;
+	casos: number;
+}
+
 export interface DashboardData {
 	departamento: string;
 	por_año: CasosPorAnio[];
+	por_fuente: CasosPorAnioFuente[];
 	sexo: DistribucionSexo[];
 	edad: DistribucionEdad[];
 	provincias: Provincia[];
 	mensual: TendenciaMensual[];
+	tasas_mortalidad?: TasaMortalidad[];
+	cancer_por_region?: CancerPorRegion[];
 }
 
 export interface NationalData {
@@ -44,17 +67,4 @@ export interface NationalData {
 	año: number | "todos";
 }
 
-export interface TendenciaStats {
-	pendiente: number;
-	intercepto: number;
-	r_cuadrado: number;
-	tendencia: "creciente" | "decreciente" | "estable";
-	media_tasa: number;
-	desviacion: number;
-	datos: {
-		año: number;
-		casos: number;
-		tasa: number;
-		tasa_proyectada: number;
-	}[];
-}
+

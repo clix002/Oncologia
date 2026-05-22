@@ -4,6 +4,7 @@
 // not business dashboards. Minimal chrome, precise data, quiet authority.
 
 import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 import {
 	Area,
 	AreaChart,
@@ -118,7 +119,11 @@ function ChartShell({
 
 export default function ChartRenderer({ grafica }: Props) {
 	const { resolvedTheme } = useTheme();
-	const t = useChartTokens(resolvedTheme);
+	const [mounted, setMounted] = useState(false);
+	useEffect(() => setMounted(true), []);
+
+	// Wait for client hydration so resolvedTheme is accurate
+	const t = useChartTokens(mounted ? resolvedTheme : "dark");
 
 	if (!grafica?.tipo || !grafica.datos || grafica.datos.length === 0) {
 		return null;

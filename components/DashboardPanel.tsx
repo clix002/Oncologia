@@ -3,14 +3,12 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { DashboardData, NationalData, RankingDepto } from "@/lib/types";
-import ChatTab from "./ChatTab";
 import DemografiaTab from "./DemografiaTab";
 import KpiCards from "./KpiCards";
 import ProvinciasTab from "./ProvinciasTab";
 import TendenciaTab from "./TendenciaTab";
-import DataStorytelling from "./DataStorytelling";
-import BalancedScorecard from "./BalancedScorecard";
-import OKRsPanel from "./OKRsPanel";
+import PredictionTab from "./PredictionTab";
+import CancerRegionTab from "./CancerRegionTab";
 
 interface DashboardPanelProps {
 	data: DashboardData | null;
@@ -23,7 +21,6 @@ export default function DashboardPanel({
 	data,
 	national,
 	loading,
-	selectedRegion,
 }: DashboardPanelProps) {
 	const departamento = data?.departamento || "PERÚ";
 	const hasRegionData = !!data && data.por_año.length > 0;
@@ -61,28 +58,18 @@ export default function DashboardPanel({
 							Provincias
 						</TabsTrigger>
 						<TabsTrigger
-							value="chat"
+							value="predicciones"
 							className="data-[state=active]:bg-card data-[state=active]:text-primary text-xs font-mono"
+							disabled={!hasRegionData}
 						>
-							Chat IA
+							Predicciones
 						</TabsTrigger>
 						<TabsTrigger
-							value="story"
+							value="tipos"
 							className="data-[state=active]:bg-card data-[state=active]:text-primary text-xs font-mono"
+							disabled={!hasRegionData}
 						>
-							Historia
-						</TabsTrigger>
-						<TabsTrigger
-							value="bsc"
-							className="data-[state=active]:bg-card data-[state=active]:text-primary text-xs font-mono"
-						>
-							BSC
-						</TabsTrigger>
-						<TabsTrigger
-							value="okrs"
-							className="data-[state=active]:bg-card data-[state=active]:text-primary text-xs font-mono"
-						>
-							OKRs
+							Tipos
 						</TabsTrigger>
 					</TabsList>
 
@@ -117,28 +104,31 @@ export default function DashboardPanel({
 						)}
 					</TabsContent>
 
-					<TabsContent value="chat" className="mt-4">
-						<ChatTab region={selectedRegion} />
-					</TabsContent>
+				<TabsContent value="predicciones" className="mt-4">
+					{hasRegionData && (
+						<PredictionTab
+							porAnio={data.por_año}
+							porFuente={data.por_fuente || []}
+							departamento={departamento}
+							tasasMortalidad={data.tasas_mortalidad}
+						/>
+					)}
+				</TabsContent>
 
-					<TabsContent value="story" className="mt-4">
-						<DataStorytelling />
-					</TabsContent>
-
-					<TabsContent value="bsc" className="mt-4">
-						<BalancedScorecard />
-					</TabsContent>
-
-					<TabsContent value="okrs" className="mt-4">
-						<OKRsPanel />
-					</TabsContent>
+				<TabsContent value="tipos" className="mt-4">
+					{hasRegionData && (
+						<CancerRegionTab
+							datos={data.cancer_por_region || []}
+							departamento={departamento}
+						/>
+					)}
+				</TabsContent>
 				</Tabs>
 			)}
 		</div>
 	);
 }
 
-/** Vista nacional: ranking de departamentos como barra horizontal */
 function NationalTendencia({ ranking }: { ranking: RankingDepto[] }) {
 	const max = Math.max(...ranking.map((r) => r.casos), 1);
 	const top15 = ranking.slice(0, 15);

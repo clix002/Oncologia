@@ -51,9 +51,12 @@ export default function TendenciaTab({
 		<div className="space-y-6">
 			{/* Casos por año */}
 			<div>
-				<h3 className="text-sm font-mono text-muted-foreground mb-3 uppercase tracking-wider">
-					Casos por año — {departamento}
+				<h3 className="text-sm font-mono text-muted-foreground mb-1 uppercase tracking-wider">
+					Atenciones por año — {departamento}
 				</h3>
+				<p className="text-xs text-muted-foreground mb-3">
+					Pacientes atendidos en el INEN. Una baja en este gráfico no significa que haya menos cáncer — puede reflejar menor acceso al sistema de salud.
+				</p>
 				<div className="h-[240px]">
 					<ResponsiveContainer width="100%" height="100%">
 						<BarChart data={barData}>

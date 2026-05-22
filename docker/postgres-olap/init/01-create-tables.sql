@@ -87,14 +87,16 @@ SELECT
     g.zona,
     t.año,
     t.mes,
+    df.nombre AS fuente,
     COUNT(f.id) AS casos,
     p.total AS poblacion,
     ROUND((COUNT(f.id)::NUMERIC / NULLIF(p.total, 0)) * 100000, 2) AS tasa_por_100k
 FROM fact_oncologia f
 JOIN dim_geografia g ON f.geografia_id = g.id
 JOIN dim_tiempo t ON f.tiempo_id = t.id
+JOIN dim_fuente df ON f.fuente_id = df.id
 LEFT JOIN poblacion p ON p.departamento = g.departamento AND p.año = t.año
-GROUP BY g.departamento, g.provincia, g.zona, t.año, t.mes, p.total;
+GROUP BY g.departamento, g.provincia, g.zona, t.año, t.mes, df.nombre, p.total;
 
 CREATE MATERIALIZED VIEW dm_demografia AS
 SELECT

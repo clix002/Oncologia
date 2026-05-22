@@ -78,6 +78,11 @@ async function main() {
   console.log("║   ETL FASE 2: OLTP → OLAP Star Schema   ║");
   console.log("╚══════════════════════════════════════════╝\n");
 
+  // ── 0. Limpiar OLAP para ETL idempotente ──
+  console.log("🧹 Limpiando tablas OLAP...");
+  await olap`TRUNCATE TABLE fact_oncologia, dim_tiempo, dim_geografia, dim_paciente, dim_fuente, dim_diagnostico, dim_establecimiento, poblacion RESTART IDENTITY CASCADE`;
+  console.log("   Tablas limpias\n");
+
   // ── 1. Cargar población INEI → OLAP ──
   console.log("📊 Cargando población INEI...");
   const wb = XLSX.readFile(INEI_PATH);
@@ -172,19 +177,25 @@ async function main() {
   const sBuf = readFileSync(sinadefPath);
   const sText = new TextDecoder("utf-8").decode(sBuf);
   const sLines = sText.split("\n");
-  // Sample 10k lines from SINADEF for cancer deaths to get age groups
   let sinadefCount = 0;
+  let sPending = "";
   for (let i = 1; i < sLines.length && sinadefCount < 100000; i++) {
-    const cols = sLines[i]?.split("|");
-    if (!cols || cols.length < 32) continue;
-    
+    const raw = sLines[i];
+    if (!raw?.trim()) continue;
+
+    const line = sPending ? sPending + "\n" + raw : raw;
+    const cols = line.split("|");
+
+    if (cols.length < 32) { sPending = line; continue; }
+    sPending = "";
+
     // Only cancer deaths
     let isCancer = false;
     for (const idx of [21, 23, 25, 27, 29, 31]) {
       if (/^C\d/.test(cols[idx]?.trim() || "")) { isCancer = true; break; }
     }
     if (!isCancer) continue;
-    
+
     const sexoRaw = cols[2]?.trim() || "DESCONOCIDO";
     const sexo = sexoRaw === "FEMENINO" ? "F" : sexoRaw === "MASCULINO" ? "M" : "X";
     const edad = parseInt(cols[3], 10);
@@ -372,7 +383,7 @@ async function main() {
   
   const sinadefDeaths = await oltp`
     SELECT 
-      p.sexo, p.ubigeo,
+      p.sexo, p.ubigeo, p.departamento, p.provincia,
       d.cod_cie10,
       EXTRACT(YEAR FROM d.fecha_diagnostico)::int as año,
       EXTRACT(MONTH FROM d.fecha_diagnostico)::int as mes
@@ -408,9 +419,24 @@ async function main() {
     }
   }
 
-  // Ahora insertar todos los facts de SINADEF  
+  // Ahora insertar todos los facts de SINADEF en batch
   const geoDefaultId = dims.geo.get("LIMA|LIMA") || 1; // fallback
   const tiempoDefaultId = dims.tiempo.get("2023-1") || 1;
+  const SINA_BATCH = 1000;
+
+  type FactRow = [string, number, number, number, number, number];
+  let batchRows: FactRow[] = [];
+
+  const flushBatch = async () => {
+    if (batchRows.length === 0) return;
+    await olap`
+      INSERT INTO fact_oncologia
+        (uuid_hash, tiempo_id, geografia_id, paciente_id, diagnostico_id, fuente_id)
+      VALUES ${olap(batchRows)}
+      ON CONFLICT DO NOTHING
+    `;
+    batchRows = [];
+  };
 
   for (const sd of sinadefDeaths) {
     const sexo = String(sd.sexo);
@@ -422,20 +448,21 @@ async function main() {
     const pid = dims.paciente.get(`${sexo}|${g10}`) || 1;
     const did = diagIdMap.get(codCie) || 1;
     const tid = dims.tiempo.get(`${año}-${mes}`) || tiempoDefaultId;
-    
-    // Geografía desde ubigeo (SINADEF no tiene mapeo directo a dim_geografia)
-    // Usamos un establecimiento default 
-    const gid = geoDefaultId;
+
+    // Geografía desde departamento/provincia (capturados del CSV SINADEF)
+    const depto = String(sd.departamento || "").toUpperCase().trim();
+    const prov = String(sd.provincia || "").toUpperCase().trim();
+    const gid = (depto && prov && dims.geo.get(`${depto}|${prov}`))
+      || (depto && dims.geo.get(`${depto}|${depto}`))
+      || geoDefaultId;
 
     if (pid && tid) {
-      await olap`
-        INSERT INTO fact_oncologia
-          (uuid_hash, tiempo_id, geografia_id, paciente_id, diagnostico_id, fuente_id)
-        VALUES (${`SIN-${factsFromSina}`}, ${tid}, ${gid}, ${pid}, ${did}, ${sinaFuenteId})
-      `;
+      batchRows.push([`SIN-${factsFromSina}`, tid, gid, pid, did, sinaFuenteId]);
       factsFromSina++;
+      if (batchRows.length >= SINA_BATCH) await flushBatch();
     }
   }
+  await flushBatch();
   console.log(`   ${factsFromSina.toLocaleString()} hechos desde SINADEF\n`);
 
   // ── 9. Refrescar Data Marts ──

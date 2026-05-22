@@ -10,7 +10,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "npx @biomejs/biome check app/api/ app/page.tsx app/layout.tsx app/arquitectura/ components/ lib/ etl/ db/",
+    "lint": "npx @biomejs/biome check app/api/ app/page.tsx app/layout.tsx app/arquitectura/ components/ lib/",
     "etl": "bun run --cwd apps/etl all",
     "etl:oltp": "bun run --cwd apps/etl load-oltp",
     "etl:olap": "bun run --cwd apps/etl load-olap",

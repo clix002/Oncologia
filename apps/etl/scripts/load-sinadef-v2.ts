@@ -17,6 +17,8 @@ const sql = postgres({
   username: process.env.POSTGRES_OLTP_USER || "oncologia",
   password: process.env.POSTGRES_OLTP_PASSWORD || "oncologia_dev_2026",
   max: 5,
+  idle_timeout: 120,
+  connect_timeout: 30,
 });
 
 const SINADEF_PATH = resolve(ROOT, "data/sinadef/fallecidos_sinadef.csv");
@@ -31,20 +33,25 @@ async function main() {
   console.log("║  ETL FASE 1: SINADEF → Defunciones Ca.  ║");
   console.log("╚══════════════════════════════════════════╝\n");
 
+  // ── 0. Limpiar datos SINADEF anteriores (idempotente) ──
+  console.log("🧹 Limpiando datos SINADEF previos...");
+  await sql`
+    DELETE FROM diagnostico WHERE paciente_id IN (
+      SELECT id FROM paciente WHERE uuid_hash LIKE 'SINADEF-%'
+    )
+  `;
+  await sql`DELETE FROM paciente WHERE uuid_hash LIKE 'SINADEF-%'`;
+  await sql`DELETE FROM fuente_dato WHERE nombre = 'SINADEF'`;
+  console.log("   Limpio\n");
+
   // ── Registrar fuente ──
   const [fuente] = await sql`
     INSERT INTO fuente_dato (nombre, archivo_origen, registros, nota)
     VALUES ('SINADEF', 'fallecidos_sinadef.csv', 0, 'Sistema Nacional de Defunciones - 2017-2024')
-    ON CONFLICT DO NOTHING
     RETURNING id
   `;
-  const fuenteId = Number(fuente?.id);
-  if (!fuenteId) {
-    // Ya existe, obtener id
-    const [f] = await sql`SELECT id FROM fuente_dato WHERE nombre = 'SINADEF' LIMIT 1`;
-    // reusar
-  }
-  console.log(`📋 Fuente SINADEF ID: ${fuenteId || (await sql`SELECT id FROM fuente_dato WHERE nombre='SINADEF' LIMIT 1`)[0]?.id}`);
+  const fuenteId = Number(fuente.id);
+  console.log(`📋 Fuente SINADEF ID: ${fuenteId}\n`);
 
   // ── FASE 1: Filtrar defunciones oncológicas en memoria ──
   console.log("📖 Escaneando SINADEF (1.1M líneas)...");
@@ -58,41 +65,73 @@ async function main() {
     hash: string;
     sexo: string;
     ubigeo: string;
+    departamento: string;
+    provincia: string;
     cancerCode: string;
     fecha: string;
   };
 
   const deaths: Death[] = [];
   let nonCancer = 0;
+  let skipped = 0;
+  let recovered = 0;
+
+  let pending = "";   // línea incompleta esperando continuación
+  let recordIdx = 0;  // índice lógico de registro (para hash estable)
 
   for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    const cols = line.split("|");
-    if (cols.length < 32) continue;
+    const raw = lines[i];
+    if (!raw?.trim()) continue;
+
+    // Intentar formar una fila completa
+    let line = pending ? pending + "\n" + raw : raw;
+    let cols = line.split("|");
+
+    if (cols.length < 32) {
+      // Aún incompleta — acumular y esperar la siguiente línea
+      pending = line;
+      continue;
+    }
+
+    // Fila completa
+    pending = "";
+    recordIdx++;
 
     // CIE-X: col 21,23,25,27,29,31
     let cancerCode = "";
     for (const idx of [21, 23, 25, 27, 29, 31]) {
       const code = cols[idx]?.trim();
       if (isCancerCode(code)) {
-        cancerCode = code.substring(0, 3);
+        cancerCode = code.substring(0, 4).trim();
         break;
       }
     }
     if (!cancerCode) { nonCancer++; continue; }
 
-    const sexoRaw = cols[2]?.trim() || "DESCONOCIDO";
+    // Limpiar sexo
+    const sexoRaw = cols[2]?.trim() || "";
     const sexo = sexoRaw === "FEMENINO" ? "F" : sexoRaw === "MASCULINO" ? "M" : "X";
+
+    // Limpiar geo
+    const deptoRaw = (cols[10] || "").trim().toUpperCase();
+    const provRaw  = (cols[11] || "").trim().toUpperCase();
+    const departamento = (deptoRaw && deptoRaw !== "SIN REGISTRO") ? deptoRaw : "DESCONOCIDO";
+    const provincia    = (provRaw  && provRaw  !== "SIN REGISTRO") ? provRaw  : "DESCONOCIDO";
+
     const ubigeo = (cols[8] || "").trim().substring(0, 6).padEnd(6, "0");
+
     const año = parseInt(cols[14], 10) || null;
     const mes = parseInt(cols[15], 10) || null;
-    if (!año || !mes) continue;
+    if (!año || !mes) { skipped++; continue; }
+
+    if (pending === "" && cols.length > 32) recovered++;  // conteo informativo
 
     deaths.push({
-      hash: `SINADEF-${String(i).padStart(8, "0")}`,
+      hash: `SINADEF-${String(recordIdx).padStart(8, "0")}`,
       sexo,
       ubigeo: ubigeo.substring(0, 6),
+      departamento,
+      provincia,
       cancerCode,
       fecha: `${año}-${String(mes).padStart(2, "0")}-01`,
     });
@@ -100,7 +139,9 @@ async function main() {
 
   const t1 = Date.now();
   console.log(`   ${deaths.length.toLocaleString()} def. oncológicas en ${((t1 - t0) / 1000).toFixed(1)}s`);
-  console.log(`   ${nonCancer.toLocaleString()} no oncológicas\n`);
+  console.log(`   ${nonCancer.toLocaleString()} no oncológicas`);
+  console.log(`   ${skipped.toLocaleString()} descartadas (sin año/mes)`);
+  console.log(`   Registros partidos recuperados: incluidos en el total\n`);
 
   // ── FASE 2: Batch INSERT pacientes ──
   console.log("💾 Insertando pacientes...");
@@ -109,11 +150,13 @@ async function main() {
   for (let i = 0; i < deaths.length; i += BATCH) {
     const chunk = deaths.slice(i, i + BATCH);
     await sql`
-      INSERT INTO paciente (uuid_hash, sexo, ubigeo)
+      INSERT INTO paciente (uuid_hash, sexo, ubigeo, departamento, provincia)
       VALUES ${sql(
-        chunk.map((d) => [d.hash, d.sexo, d.ubigeo])
+        chunk.map((d) => [d.hash, d.sexo, d.ubigeo, d.departamento, d.provincia])
       )}
-      ON CONFLICT (uuid_hash) DO NOTHING
+      ON CONFLICT (uuid_hash) DO UPDATE SET
+        departamento = EXCLUDED.departamento,
+        provincia = EXCLUDED.provincia
     `;
     if (i % (BATCH * 10) === 0 && i > 0) {
       console.log(`   ${Math.round((i / deaths.length) * 100)}%`);

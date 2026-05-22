@@ -1,10 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
 import {
+	getCancerPorRegion,
 	getCasosPorDeptoAnio,
+	getCasosPorDeptoAnioFuente,
 	getDistribucionEdad,
 	getDistribucionSexo,
 	getProvincias,
 	getRankingDepartamentos,
+	getTasasMortalidad,
 	getTendenciaMensual,
 } from "@/lib/stats";
 
@@ -17,21 +20,27 @@ export async function GET(request: NextRequest) {
 			: undefined;
 
 		if (depto && depto !== "ALL") {
-			const [porAño, sexo, edad, provincias, mensual] = await Promise.all([
+			const [porAño, porFuente, sexo, edad, provincias, mensual, tasasMortalidad, cancerPorRegion] = await Promise.all([
 				getCasosPorDeptoAnio(depto),
+				getCasosPorDeptoAnioFuente(depto),
 				getDistribucionSexo(depto, año),
 				getDistribucionEdad(depto, año),
 				getProvincias(depto, año),
 				getTendenciaMensual(depto, año || 2024),
+				getTasasMortalidad(depto),
+				getCancerPorRegion(depto),
 			]);
 
 			return NextResponse.json({
 				departamento: depto,
 				por_año: porAño,
+				por_fuente: porFuente,
 				sexo,
 				edad,
 				provincias,
 				mensual,
+				tasas_mortalidad: tasasMortalidad,
+				cancer_por_region: cancerPorRegion,
 			});
 		}
 

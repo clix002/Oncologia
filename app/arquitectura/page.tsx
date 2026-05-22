@@ -376,7 +376,7 @@ export default function DataCatalogPage() {
                 <CardHeader>
                   <CardTitle className="text-sm font-mono">Cobertura del Sílabo</CardTitle>
                   <CardDescription className="text-xs">
-                    EIS9A261N — Investigación e Inteligencia de Negocios
+            EIS9A261N — Investigación e Inteligencia de Negocios
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -512,7 +512,7 @@ export default function DataCatalogPage() {
         {/* ── Footer ── */}
         <footer className="border-t border-border pt-4 text-center">
           <p className="text-[10px] text-muted-foreground font-mono">
-            EIS9A261N · Escuela La Pontificia · 2026
+            by clix
           </p>
         </footer>
       </main>
