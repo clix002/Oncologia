@@ -1,7 +1,7 @@
 /**
  * load-tasas.ts — Carga tasas de mortalidad oncológica a fact_tasas_mortalidad
  *
- * Fuente: raw-tasas/Tasa_Grupo10_LM_v1.xlsx
+ * Fuente: data/tasas_mortalidad/Tasa_Grupo10_LM_v1.xlsx
  * Filtro: ggrupos = "Enfermedades neoplasicas"
  * Años: 2000-2024, 25 departamentos + "#PERU" (nacional)
  */
@@ -19,9 +19,10 @@ const olap = postgres({
   idle_timeout: 60,
 });
 
+const DATA_ROOT = path.resolve(__dirname, "../../../data");
 const XLSX_PATH = path.resolve(
   process.env.DATA_PATH ||
-    path.join(__dirname, "../../../db/oncologia/raw-tasas/Tasa_Grupo10_LM_v1.xlsx")
+    path.join(DATA_ROOT, "tasas_mortalidad/Tasa_Grupo10_LM_v1.xlsx")
 );
 
 function normalizeSexo(raw: string): string {

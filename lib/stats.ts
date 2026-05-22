@@ -254,3 +254,31 @@ export async function getCancerPorRegion(departamento: string): Promise<
     casos: Number(r.casos),
   }));
 }
+
+export async function getDpcanPorRegion(departamento: string): Promise<
+  { tipo_cancer: string; año: number; num: number; den: number; cobertura_pct: number }[]
+> {
+  const s = sql();
+  const rows = await s`
+    SELECT
+      tipo_cancer,
+      año,
+      SUM(num) AS num,
+      SUM(den) AS den
+    FROM fact_dpcan
+    WHERE UPPER(departamento) = UPPER(${departamento})
+    GROUP BY tipo_cancer, año
+    ORDER BY tipo_cancer, año
+  `;
+  return rows.map((r) => {
+    const num = Number(r.num);
+    const den = Number(r.den);
+    return {
+      tipo_cancer: String(r.tipo_cancer),
+      año: Number(r.año),
+      num,
+      den,
+      cobertura_pct: den > 0 ? Math.round((num / den) * 100 * 10) / 10 : 0,
+    };
+  });
+}

@@ -58,6 +58,7 @@ export function useDashboardData(
 					mensual: json.mensual || [],
 					tasas_mortalidad: json.tasas_mortalidad || [],
 					cancer_por_region: json.cancer_por_region || [],
+					dpcan: json.dpcan || [],
 				});
 			} else {
 				if (id !== dataFetchId.current) return;

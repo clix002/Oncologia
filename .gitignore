@@ -65,9 +65,4 @@ skills-lock.json
 docker/etl-service/.env
 
 # raw data — archivos grandes, no subir a git
-db/oncologia/raw-sisa/
-db/oncologia/raw-sinadef/
-db/oncologia/raw-inen/
-db/oncologia/raw-inei/
-db/oncologia/raw-dpcan/
-db/oncologia/raw-tasas/
+data/
