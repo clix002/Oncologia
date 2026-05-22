@@ -14,7 +14,7 @@ import XLSX from "xlsx";
 import Papa from "papaparse";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(__dirname, "../..");
+const ROOT = resolve(__dirname, "../../..");
 
 // ── Conexiones ──
 const oltp = postgres({

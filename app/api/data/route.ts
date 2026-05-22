@@ -5,6 +5,7 @@ import {
 	getCasosPorDeptoAnioFuente,
 	getDistribucionEdad,
 	getDistribucionSexo,
+	getDpcanPorRegion,
 	getProvincias,
 	getRankingDepartamentos,
 	getTasasMortalidad,
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
 			: undefined;
 
 		if (depto && depto !== "ALL") {
-			const [porAño, porFuente, sexo, edad, provincias, mensual, tasasMortalidad, cancerPorRegion] = await Promise.all([
+			const [porAño, porFuente, sexo, edad, provincias, mensual, tasasMortalidad, cancerPorRegion, dpcan] = await Promise.all([
 				getCasosPorDeptoAnio(depto),
 				getCasosPorDeptoAnioFuente(depto),
 				getDistribucionSexo(depto, año),
@@ -29,6 +30,7 @@ export async function GET(request: NextRequest) {
 				getTendenciaMensual(depto, año || 2024),
 				getTasasMortalidad(depto),
 				getCancerPorRegion(depto),
+				getDpcanPorRegion(depto),
 			]);
 
 			return NextResponse.json({
@@ -41,6 +43,7 @@ export async function GET(request: NextRequest) {
 				mensual,
 				tasas_mortalidad: tasasMortalidad,
 				cancer_por_region: cancerPorRegion,
+				dpcan,
 			});
 		}
 

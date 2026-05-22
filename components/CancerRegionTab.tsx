@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
 import {
 	Bar,
 	BarChart,
@@ -24,6 +26,18 @@ const COLORS = [
 ];
 
 export default function CancerRegionTab({ datos, departamento }: CancerRegionTabProps) {
+	const { resolvedTheme } = useTheme();
+	const [mounted, setMounted] = useState(false);
+	useEffect(() => setMounted(true), []);
+
+	const isDark = !mounted || resolvedTheme === "dark";
+	const tooltipBg = isDark ? "#161b22" : "#ffffff";
+	const tooltipBorder = isDark ? "#30363d" : "#d0d7de";
+	const tooltipColor = isDark ? "#e6edf3" : "#1f2328";
+	const gridColor = isDark ? "#30363d" : "#d0d7de";
+	const axisColor = isDark ? "#7d8590" : "#656d76";
+	const labelColor = isDark ? "#e6edf3" : "#1f2328";
+
 	if (!datos || datos.length === 0) {
 		return (
 			<p className="text-sm text-muted-foreground font-mono py-6 text-center">
@@ -52,10 +66,10 @@ export default function CancerRegionTab({ datos, departamento }: CancerRegionTab
 							layout="vertical"
 							margin={{ top: 0, right: 60, left: 8, bottom: 0 }}
 						>
-							<CartesianGrid strokeDasharray="3 3" stroke="#30363d" horizontal={false} />
+							<CartesianGrid strokeDasharray="3 3" stroke={gridColor} horizontal={false} />
 							<XAxis
 								type="number"
-								tick={{ fill: "#7d8590", fontSize: 11, fontFamily: "monospace" }}
+								tick={{ fill: axisColor, fontSize: 11, fontFamily: "monospace" }}
 								axisLine={false}
 								tickLine={false}
 								tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)}
@@ -64,19 +78,22 @@ export default function CancerRegionTab({ datos, departamento }: CancerRegionTab
 								type="category"
 								dataKey="tipo"
 								width={140}
-								tick={{ fill: "#e6edf3", fontSize: 11, fontFamily: "monospace" }}
+								tick={{ fill: labelColor, fontSize: 11, fontFamily: "monospace" }}
 								axisLine={false}
 								tickLine={false}
 							/>
-							<Tooltip
-								contentStyle={{
-									background: "#161b22",
-									border: "1px solid #30363d",
-									borderRadius: 6,
-									fontSize: 12,
-									fontFamily: "monospace",
-									color: "#e6edf3",
-								}}
+						<Tooltip
+							contentStyle={{
+								background: tooltipBg,
+								border: `1px solid ${tooltipBorder}`,
+								borderRadius: 6,
+								fontSize: 12,
+								fontFamily: "monospace",
+								color: tooltipColor,
+							}}
+							labelStyle={{ color: tooltipColor }}
+							itemStyle={{ color: tooltipColor }}
+							cursor={{ fill: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)" }}
 								formatter={(value, _name, props) => {
 									const n = Number(value ?? 0);
 									return [

@@ -48,6 +48,14 @@ export interface CancerPorRegion {
 	casos: number;
 }
 
+export interface DpcanPorRegion {
+	tipo_cancer: string;
+	año: number;
+	num: number;
+	den: number;
+	cobertura_pct: number;
+}
+
 export interface DashboardData {
 	departamento: string;
 	por_año: CasosPorAnio[];
@@ -58,6 +66,7 @@ export interface DashboardData {
 	mensual: TendenciaMensual[];
 	tasas_mortalidad?: TasaMortalidad[];
 	cancer_por_region?: CancerPorRegion[];
+	dpcan?: DpcanPorRegion[];
 }
 
 export interface NationalData {

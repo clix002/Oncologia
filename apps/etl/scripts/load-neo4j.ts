@@ -72,9 +72,13 @@ async function main() {
 
   const session = driver.session({ database: "neo4j" });
 
-  // ── Limpiar ──
+  // ── Limpiar en batches para no exceder memoria ──
   console.log("🧹 Limpiando grafo existente...");
-  await session.run("MATCH (n) DETACH DELETE n");
+  let deleted = 1;
+  while (deleted > 0) {
+    const result = await session.run("MATCH (n) WITH n LIMIT 10000 DETACH DELETE n RETURN count(n) AS deleted");
+    deleted = result.records[0]?.get("deleted").toInt() ?? 0;
+  }
   console.log("   Grafo limpio\n");
 
   // ── Constraints e índices ──

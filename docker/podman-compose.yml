@@ -2,38 +2,12 @@ version: "3.9"
 
 # =============================================================
 # INEN Oncología - BI Dashboard Perú
-# Arquitectura por Capas Containerizada
-# Compatible con: podman compose y docker compose
 # =============================================================
 
 services:
 
   # ──────────────────────────────────────────────
-  # CAPA 1: Data Lake (MinIO)
-  # ──────────────────────────────────────────────
-  minio:
-    image: docker.io/minio/minio:latest
-    container_name: oncologia-minio
-    command: server /data --console-address ":9002"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin_dev_2026}
-    ports:
-      - "${MINIO_API_PORT:-9001}:9000"
-      - "${MINIO_CONSOLE_PORT:-9002}:9002"
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    networks:
-      - oncologia_net
-    restart: unless-stopped
-
-  # ──────────────────────────────────────────────
-  # CAPA 2: PostgreSQL OLTP (BD Transaccional)
+  # PostgreSQL OLTP (ingesta / ETL)
   # ──────────────────────────────────────────────
   postgres_oltp:
     image: docker.io/library/postgres:16-alpine
@@ -57,7 +31,7 @@ services:
     restart: unless-stopped
 
   # ──────────────────────────────────────────────
-  # CAPA 3: PostgreSQL OLAP (Data Warehouse)
+  # PostgreSQL OLAP (Data Warehouse — frontend)
   # ──────────────────────────────────────────────
   postgres_olap:
     image: docker.io/library/postgres:16-alpine
@@ -81,7 +55,7 @@ services:
     restart: unless-stopped
 
   # ──────────────────────────────────────────────
-  # CAPA 4: MongoDB (NoSQL Documental)
+  # MongoDB (documentos clínicos — ETL)
   # ──────────────────────────────────────────────
   mongodb:
     image: docker.io/library/mongo:7
@@ -105,36 +79,17 @@ services:
     restart: unless-stopped
 
   # ──────────────────────────────────────────────
-  # CAPA 4: Redis (Caché In-Memory)
-  # ──────────────────────────────────────────────
-  redis:
-    image: docker.io/library/redis:7-alpine
-    container_name: oncologia-redis
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
-    ports:
-      - "${REDIS_PORT:-6380}:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 3
-    networks:
-      - oncologia_net
-    restart: unless-stopped
-
-  # ──────────────────────────────────────────────
-  # CAPA 4: Neo4j (Base de Datos de Grafos)
+  # Neo4j (grafo de pacientes — ETL)
   # ──────────────────────────────────────────────
   neo4j:
     image: docker.io/library/neo4j:5-community
     container_name: oncologia-neo4j
     environment:
       NEO4J_AUTH: "${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-oncologia_graph_2026}"
-      NEO4J_dbms_memory_heap_initial__size: 256m
-      NEO4J_dbms_memory_heap_max__size: 768m
+      NEO4J_dbms_memory_heap_initial__size: 512m
+      NEO4J_dbms_memory_heap_max__size: 1024m
       NEO4J_dbms_memory_pagecache_size: 256m
+      NEO4J_dbms_memory_transaction_total_max: 1024m
     ports:
       - "${NEO4J_HTTP_PORT:-7475}:7474"
       - "${NEO4J_BOLT_PORT:-7688}:7687"
@@ -151,13 +106,7 @@ services:
     restart: unless-stopped
 
   # ──────────────────────────────────────────────
-  # CAPA 5: Apache Spark — se ejecuta local (PySpark)
-  # La imagen bitnami/spark fue deprecada de Docker Hub.
-  # Spark se usa via `python3 spark_analytics.py` en el host.
-  # ──────────────────────────────────────────────
-
-  # ──────────────────────────────────────────────
-  # CAPA 6: Ollama (LLM Local - ligero)
+  # Ollama (LLM local — chat IA)
   # ──────────────────────────────────────────────
   ollama:
     image: docker.io/ollama/ollama:latest
@@ -167,101 +116,25 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
     networks:
       - oncologia_net
     restart: unless-stopped
-    # Para descargar modelos al iniciar:
-    # entrypoint: ["/bin/sh", "-c"]
-    # command:
-    #   - |
-    #     ollama serve &
-    #     sleep 5
-    #     ollama pull nomic-embed-text:latest
-    #     ollama pull gemma3:1b
-    #     wait
-
-  # ──────────────────────────────────────────────
-  # CAPA 7: Python Analytics (Minería + NLP)
-  # ──────────────────────────────────────────────
-  python-analytics:
-    build:
-      context: ./python-analytics
-      dockerfile: Dockerfile
-    container_name: oncologia-analytics
-    environment:
-      POSTGRES_OLTP_HOST: postgres_oltp
-      POSTGRES_OLAP_HOST: postgres_olap
-      POSTGRES_USER: ${POSTGRES_OLTP_USER:-oncologia}
-      POSTGRES_PASSWORD: ${POSTGRES_OLTP_PASSWORD:-oncologia_dev_2026}
-      MONGO_URI: mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD:-admin_dev_2026}@mongodb:27017
-      REDIS_HOST: redis
-      NEO4J_URI: bolt://neo4j:7687
-      NEO4J_USER: ${NEO4J_USER:-neo4j}
-      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-oncologia_graph_2026}
-      OLLAMA_HOST: http://ollama:11434
-    ports:
-      - "${PYTHON_ANALYTICS_PORT:-8001}:8001"
-    depends_on:
-      postgres_oltp:
-        condition: service_healthy
-      postgres_olap:
-        condition: service_healthy
-      mongodb:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - ./python-analytics/scripts:/app/scripts:Z
-      - ./data:/app/data:Z
-    networks:
-      - oncologia_net
-    restart: unless-stopped
-
-  # ──────────────────────────────────────────────
-  # CAPA 8: ETL Service (Carga de datos)
-  # ──────────────────────────────────────────────
-  etl-service:
-    build:
-      context: ./etl-service
-      dockerfile: Dockerfile
-    container_name: oncologia-etl
-    environment:
-      POSTGRES_OLTP_HOST: postgres_oltp
-      POSTGRES_OLTP_PORT: "5432"
-      POSTGRES_OLTP_DB: ${POSTGRES_OLTP_DB:-oncologia_oltp}
-      POSTGRES_OLTP_USER: ${POSTGRES_OLTP_USER:-oncologia}
-      POSTGRES_OLTP_PASSWORD: ${POSTGRES_OLTP_PASSWORD:-oncologia_dev_2026}
-    depends_on:
-      postgres_oltp:
-        condition: service_healthy
-    volumes:
-      - ./data:/app/data:ro
-      - ./etl-service/scripts:/app/scripts:ro
-    networks:
-      - oncologia_net
-    restart: "no"
-    profiles:
-      - etl
 
 # ──────────────────────────────────────────────
-# VOLÚMENES PERSISTENTES
+# VOLÚMENES
 # ──────────────────────────────────────────────
 volumes:
-  minio_data:
-    name: oncologia_minio_data
   postgres_oltp_data:
     name: oncologia_oltp_data
   postgres_olap_data:
     name: oncologia_olap_data
   mongo_data:
     name: oncologia_mongo_data
-  redis_data:
-    name: oncologia_redis_data
   neo4j_data:
     name: oncologia_neo4j_data
   neo4j_logs:
@@ -270,7 +143,7 @@ volumes:
     name: oncologia_ollama_data
 
 # ──────────────────────────────────────────────
-# RED INTERNA
+# RED
 # ──────────────────────────────────────────────
 networks:
   oncologia_net:

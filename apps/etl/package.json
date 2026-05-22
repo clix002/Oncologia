@@ -10,8 +10,9 @@
     "load-mongo": "bun run scripts/load-mongo.ts",
     "load-neo4j": "bun run scripts/load-neo4j.ts",
     "load-tasas": "bun run scripts/load-tasas.ts",
+    "load-dpcan": "bun run scripts/load-dpcan.ts",
     "quality": "bun run scripts/quality-check.ts",
-    "all": "bun run load-ci10 && bun run load-oltp && bun run load-sinadef && bun run load-olap && bun run load-tasas && bun run load-mongo && bun run load-neo4j && bun run quality"
+    "all": "bun run load-ci10 && bun run load-oltp && bun run load-sinadef && bun run load-olap && bun run load-tasas && bun run load-dpcan && bun run load-mongo && bun run load-neo4j && bun run quality"
   },
   "dependencies": {
     "@oncologia/types": "workspace:*",

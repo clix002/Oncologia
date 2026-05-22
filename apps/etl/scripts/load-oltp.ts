@@ -17,7 +17,7 @@ import Papa from "papaparse";
 import postgres from "postgres";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(__dirname, "../..");
+const ROOT = resolve(__dirname, "../../..");
 
 // ── Conexión ──
 const sql = postgres({

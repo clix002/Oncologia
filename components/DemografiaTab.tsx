@@ -25,6 +25,8 @@ const SEX_COLORS: Record<string, string> = {
 	MASCULINO: "#58a6ff",
 	F: "#f78166",
 	M: "#58a6ff",
+	Femenino: "#f78166",
+	Masculino: "#58a6ff",
 };
 
 export default function DemografiaTab({

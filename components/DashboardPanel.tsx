@@ -9,6 +9,7 @@ import ProvinciasTab from "./ProvinciasTab";
 import TendenciaTab from "./TendenciaTab";
 import PredictionTab from "./PredictionTab";
 import CancerRegionTab from "./CancerRegionTab";
+import DpcanTab from "./DpcanTab";
 
 interface DashboardPanelProps {
 	data: DashboardData | null;
@@ -71,6 +72,13 @@ export default function DashboardPanel({
 						>
 							Tipos
 						</TabsTrigger>
+						<TabsTrigger
+							value="tamizaje"
+							className="data-[state=active]:bg-card data-[state=active]:text-primary text-xs font-mono"
+							disabled={!hasRegionData}
+						>
+							Tamizaje
+						</TabsTrigger>
 					</TabsList>
 
 					<TabsContent value="tendencia" className="mt-4">
@@ -119,6 +127,15 @@ export default function DashboardPanel({
 					{hasRegionData && (
 						<CancerRegionTab
 							datos={data.cancer_por_region || []}
+							departamento={departamento}
+						/>
+					)}
+				</TabsContent>
+
+				<TabsContent value="tamizaje" className="mt-4">
+					{hasRegionData && (
+						<DpcanTab
+							datos={data.dpcan || []}
 							departamento={departamento}
 						/>
 					)}
