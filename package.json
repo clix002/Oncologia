@@ -7,7 +7,8 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "next dev",
+    "init": "bun run scripts/init.ts",
+    "dev": "bun run scripts/dev.ts",
     "build": "next build",
     "start": "next start",
     "lint": "npx @biomejs/biome check app/api/ app/page.tsx app/layout.tsx app/arquitectura/ components/ lib/",
@@ -19,7 +20,6 @@
     "etl:neo4j": "bun run --cwd apps/etl load-neo4j",
     "services": "podman compose -f docker/podman-compose.yml up -d",
     "services:down": "podman compose -f docker/podman-compose.yml down",
-    "dev:all": "podman compose -f docker/podman-compose.yml up -d && next dev",
     "turbo": "turbo"
   },
   "dependencies": {

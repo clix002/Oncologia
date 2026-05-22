@@ -82,15 +82,18 @@ export default function CancerRegionTab({ datos, departamento }: CancerRegionTab
 								axisLine={false}
 								tickLine={false}
 							/>
-							<Tooltip
-								contentStyle={{
-									background: tooltipBg,
-									border: `1px solid ${tooltipBorder}`,
-									borderRadius: 6,
-									fontSize: 12,
-									fontFamily: "monospace",
-									color: tooltipColor,
-								}}
+						<Tooltip
+							contentStyle={{
+								background: tooltipBg,
+								border: `1px solid ${tooltipBorder}`,
+								borderRadius: 6,
+								fontSize: 12,
+								fontFamily: "monospace",
+								color: tooltipColor,
+							}}
+							labelStyle={{ color: tooltipColor }}
+							itemStyle={{ color: tooltipColor }}
+							cursor={{ fill: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)" }}
 								formatter={(value, _name, props) => {
 									const n = Number(value ?? 0);
 									return [

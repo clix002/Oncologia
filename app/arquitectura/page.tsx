@@ -20,15 +20,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Database, Server, Layers, BarChart4, ArrowDown, FileSpreadsheet, HardDrive, GitBranch, Workflow } from "lucide-react";
+import { Database, Server, Layers, BarChart4, ArrowDown, FileSpreadsheet, GitBranch, Workflow } from "lucide-react";
 
 const STATS = [
-  { value: "204,399", label: "Pacientes", icon: "👤" },
-  { value: "66,145", label: "Atenciones INEN", icon: "🏥" },
-  { value: "138,256", label: "Def. oncológicas", icon: "🎗️" },
-  { value: "204,401", label: "Hechos OLAP", icon: "⭐" },
-  { value: "6,986", label: "Docs clínicos", icon: "📄" },
-  { value: "15,328", label: "Nodos Neo4j", icon: "🕸️" },
+  { value: "206,656", label: "Pacientes", icon: "👤" },
+  { value: "198,435", label: "Atenciones INEN", icon: "🏥" },
+  { value: "140,513", label: "Def. oncológicas", icon: "🎗️" },
+  { value: "338,948", label: "Hechos OLAP", icon: "⭐" },
+  { value: "35,031", label: "Docs clínicos", icon: "📄" },
+  { value: "206,656", label: "Nodos Neo4j", icon: "🕸️" },
   { value: "25", label: "Departamentos", icon: "🗺️" },
   { value: "100%", label: "Data Quality", icon: "✅" },
 ];
@@ -124,10 +124,8 @@ const TECH_STACK = [
     category: "Bases de Datos",
     items: [
       { name: "PostgreSQL", version: "16", desc: "OLTP (3FN) + OLAP (Star Schema)" },
-      { name: "MongoDB", version: "7", desc: "Documentos clínicos · 6,986 registros" },
-      { name: "Redis", version: "7", desc: "Caché in-memory · 16 keys dashboard" },
-      { name: "Neo4j", version: "5", desc: "Knowledge Graph · 15k nodos" },
-      { name: "MinIO", version: "latest", desc: "Data Lake · 8 buckets · S3 API" },
+      { name: "MongoDB", version: "7", desc: "Documentos clínicos · 35k registros" },
+      { name: "Neo4j", version: "5", desc: "Knowledge Graph · 206k nodos" },
     ],
   },
   {
@@ -142,7 +140,7 @@ const TECH_STACK = [
   {
     category: "Infraestructura",
     items: [
-      { name: "Podman", version: "5.8", desc: "10 contenedores · compose" },
+      { name: "Podman", version: "5.8", desc: "5 contenedores · compose" },
       { name: "Fedora", version: "44", desc: "Sistema operativo host" },
       { name: "Gemini API", version: "—", desc: "Chat IA principal · fallback Ollama" },
     ],
@@ -411,7 +409,7 @@ export default function DataCatalogPage() {
                     Pipeline de Datos
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Flujo end-to-end: 7 etapas desde la fuente cruda hasta el dashboard
+                    Flujo end-to-end: 6 etapas desde la fuente cruda hasta el dashboard
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -431,49 +429,41 @@ export default function DataCatalogPage() {
                         },
                         {
                           step: "02",
-                          label: "Data Lake",
-                          tech: "MinIO · 8 buckets · S3-compatible API",
-                          detail: "59 objetos raw inmutables · particionado por fuente",
-                          icon: HardDrive,
-                          color: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20",
-                        },
-                        {
-                          step: "03",
                           label: "ETL → OLTP",
                           tech: "Bun + PapaParse · PostgreSQL 16 · 3FN",
-                          detail: "204k pacientes · 66k atenciones · 138k diagnósticos · 100% data quality",
+                          detail: "206k pacientes · 198k atenciones · 140k diagnósticos · 100% data quality",
                           icon: ArrowDown,
                           color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
                         },
                         {
-                          step: "04",
+                          step: "03",
                           label: "OLTP → OLAP",
                           tech: "Star Schema · 6 dimensiones · PostgreSQL 16",
-                          detail: "204k hechos · dims: tiempo, geografía, paciente, diagnóstico, establecimiento, fuente",
+                          detail: "338k hechos · dims: tiempo, geografía, paciente, diagnóstico, establecimiento, fuente",
                           icon: GitBranch,
                           color: "text-amber-400 bg-amber-500/10 border-amber-500/20",
                         },
                         {
-                          step: "05",
+                          step: "04",
                           label: "Enriquecimiento",
-                          tech: "MongoDB 7 · Neo4j 5 · Redis 7",
-                          detail: "6,986 docs clínicos · 15k nodos grafo conocimiento · 16 keys caché",
+                          tech: "MongoDB 7 · Neo4j 5",
+                          detail: "35k docs clínicos · 206k nodos grafo de conocimiento",
                           icon: Layers,
                           color: "text-purple-400 bg-purple-500/10 border-purple-500/20",
                         },
                         {
-                          step: "06",
+                          step: "05",
                           label: "Analítica",
-                          tech: "Python scikit-learn · spaCy · PySpark · Ollama",
-                          detail: "Clustering K-means · Random Forest · NLP (NER/POS/Sentimiento) · Red Neuronal MLP",
+                          tech: "simple-statistics · OLS · Prophet · Ollama",
+                          detail: "Regresión lineal · proyecciones de tendencia · predicciones por tipo de cáncer",
                           icon: BarChart4,
                           color: "text-rose-400 bg-rose-500/10 border-rose-500/20",
                         },
                         {
-                          step: "07",
+                          step: "06",
                           label: "Visualización",
                           tech: "Next.js 16 · Recharts · shadcn/ui · Gemini/Ollama Chat",
-                          detail: "Dashboard interactivo · Data Storytelling · BSC · OKRs · Chat IA con RAG",
+                          detail: "Dashboard interactivo · 6 pestañas · mapa del Perú · chat IA con contexto clínico",
                           icon: Server,
                           color: "text-orange-400 bg-orange-500/10 border-orange-500/20",
                         },
