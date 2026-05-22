@@ -4,7 +4,7 @@ import { detectFilters, retrieveContext } from "@/lib/retrieval";
 import { getRankingDepartamentos, resumenDepartamento } from "@/lib/stats";
 
 const SYSTEM_PROMPT_TEMPLATE = `Eres un analista de inteligencia de negocios especializado en salud pública en Perú.
-Analizas datos de casos oncológicos nuevos registrados en el INEN para todos los departamentos del Perú (2022-2025).
+Analizas datos de casos oncológicos nuevos registrados en el INEN para [SCOPE_DESC] (2022-2025).
 
 CONTEXTO RELEVANTE (recuperado por similitud semántica):
 [CONTEXTO_RAG]
@@ -18,7 +18,8 @@ REGLAS:
 3. Siempre responde en español.
 4. Si la pregunta puede visualizarse con una gráfica, inclúyela.
 5. Los datos son de pacientes que llegaron al INEN (Lima), no todos los casos de cada departamento.
-6. Responde SIEMPRE en este formato JSON exacto:
+6. IMPORTANTE: Si hay un departamento de contexto ([SCOPE_DESC]), SOLO analiza datos de ese departamento. No menciones otros departamentos a menos que el usuario lo pida explícitamente.
+7. Responde SIEMPRE en este formato JSON exacto:
 
 {
   "texto": "Tu análisis aquí en 2-4 oraciones",
@@ -41,12 +42,13 @@ interface HistoryEntry {
 interface ChatRequestBody {
 	message: string;
 	history?: HistoryEntry[];
+	region?: string;
 }
 
 export async function POST(request: NextRequest) {
 	try {
 		const body: ChatRequestBody = await request.json();
-		const { message, history = [] } = body;
+		const { message, history = [], region } = body;
 
 		if (!message || typeof message !== "string" || message.trim() === "") {
 			return NextResponse.json(
@@ -55,10 +57,24 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
+		// Bloquear intentos de enviar imágenes (gemma3:1b no es multimodal)
+		if (message.includes("image.png") || message.includes("data:image") || message.includes("<image")) {
+			return NextResponse.json({
+				texto: "El modelo local (gemma3:1b) solo acepta texto, no imágenes. Escribí tu consulta en formato de texto.",
+				grafica: null,
+			});
+		}
+
 		const query = message.trim();
 
-		// 1. Detectar filtros en la pregunta
+		// 1. Detectar filtros en la pregunta; region del mapa tiene prioridad
 		const filters = detectFilters(query);
+		if (region) {
+			filters.departamento = region.toUpperCase();
+		}
+		const scopeDesc = filters.departamento
+			? `el departamento de ${filters.departamento}`
+			: "todos los departamentos del Perú";
 
 		// 2. Recuperar contexto RAG
 		let ragContext = "";
@@ -88,10 +104,10 @@ export async function POST(request: NextRequest) {
 		}
 
 		// 4. Construir prompt
-		const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace(
-			"[CONTEXTO_RAG]",
-			ragContext || "No se encontró contexto relevante.",
-		).replace("[DATOS_SQL]", sqlData || "No disponible.");
+		const systemPrompt = SYSTEM_PROMPT_TEMPLATE
+			.replace(/\[SCOPE_DESC\]/g, scopeDesc)
+			.replace("[CONTEXTO_RAG]", ragContext || "No se encontró contexto relevante.")
+			.replace("[DATOS_SQL]", sqlData || "No disponible.");
 
 		// 5. Llamar LLM
 		const result = await callAI(systemPrompt, query, history);

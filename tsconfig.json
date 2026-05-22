@@ -20,7 +20,8 @@
     ],
     "types": ["bun"],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@oncologia/types": ["./packages/types/src"]
     }
   },
   "include": [

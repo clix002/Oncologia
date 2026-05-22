@@ -8,6 +8,9 @@ import DemografiaTab from "./DemografiaTab";
 import KpiCards from "./KpiCards";
 import ProvinciasTab from "./ProvinciasTab";
 import TendenciaTab from "./TendenciaTab";
+import DataStorytelling from "./DataStorytelling";
+import BalancedScorecard from "./BalancedScorecard";
+import OKRsPanel from "./OKRsPanel";
 
 interface DashboardPanelProps {
 	data: DashboardData | null;
@@ -63,6 +66,24 @@ export default function DashboardPanel({
 						>
 							Chat IA
 						</TabsTrigger>
+						<TabsTrigger
+							value="story"
+							className="data-[state=active]:bg-card data-[state=active]:text-primary text-xs font-mono"
+						>
+							Historia
+						</TabsTrigger>
+						<TabsTrigger
+							value="bsc"
+							className="data-[state=active]:bg-card data-[state=active]:text-primary text-xs font-mono"
+						>
+							BSC
+						</TabsTrigger>
+						<TabsTrigger
+							value="okrs"
+							className="data-[state=active]:bg-card data-[state=active]:text-primary text-xs font-mono"
+						>
+							OKRs
+						</TabsTrigger>
 					</TabsList>
 
 					<TabsContent value="tendencia" className="mt-4">
@@ -98,6 +119,18 @@ export default function DashboardPanel({
 
 					<TabsContent value="chat" className="mt-4">
 						<ChatTab region={selectedRegion} />
+					</TabsContent>
+
+					<TabsContent value="story" className="mt-4">
+						<DataStorytelling />
+					</TabsContent>
+
+					<TabsContent value="bsc" className="mt-4">
+						<BalancedScorecard />
+					</TabsContent>
+
+					<TabsContent value="okrs" className="mt-4">
+						<OKRsPanel />
 					</TabsContent>
 				</Tabs>
 			)}

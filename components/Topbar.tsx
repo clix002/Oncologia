@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import ThemeToggle from "./ThemeToggle";
 
 interface TopbarProps {
 	selectedRegion: string | null;
@@ -30,12 +31,13 @@ export default function Topbar({ selectedRegion, onClearRegion }: TopbarProps) {
 					</Badge>
 				)}
 			</div>
-			<nav className="flex items-center gap-4">
+			<nav className="flex items-center gap-3">
+				<ThemeToggle />
 				<Link
 					href="/arquitectura"
 					className="text-sm text-muted-foreground hover:text-primary transition-colors"
 				>
-					Arquitectura →
+					Data Catalog →
 				</Link>
 			</nav>
 		</header>

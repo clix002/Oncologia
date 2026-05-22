@@ -1,0 +1,40 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["**/.env"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "dist/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": []
+    },
+    "load-oltp": {
+      "cache": false
+    },
+    "load-olap": {
+      "cache": false,
+      "dependsOn": ["load-oltp"]
+    },
+    "load-sinadef": {
+      "cache": false
+    },
+    "load-mongo": {
+      "cache": false
+    },
+    "load-neo4j": {
+      "cache": false
+    },
+    "load-ci10": {
+      "cache": false
+    },
+    "all": {
+      "cache": false,
+      "dependsOn": ["load-ci10", "load-oltp", "load-sinadef", "load-olap", "load-mongo", "load-neo4j"]
+    }
+  }
+}

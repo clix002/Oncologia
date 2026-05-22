@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -47,10 +47,16 @@ next-env.d.ts
 
 # documentation (LaTeX)
 /docs/
+
+# docker
+docker/.env
+!docker/.env.example
+docker/data/
+
 # Claude / AI tooling — no subir
 CLAUDE.md
 .claudes
 skills-lock.json
 .agents/
 .claude/
-.interface-design/
+docker/etl-service/.env

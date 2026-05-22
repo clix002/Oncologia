@@ -3,6 +3,7 @@
 // WHY: Charts in a clinical BI context should feel like instrument readouts,
 // not business dashboards. Minimal chrome, precise data, quiet authority.
 
+import { useTheme } from "next-themes";
 import {
 	Area,
 	AreaChart,
@@ -32,53 +33,51 @@ interface Props {
 	grafica: GraficaData | null;
 }
 
-// Medical domain palette: blood red → amber bile → slate surgical → ECG green
-// Each color has an epidemiological counterpart in real clinical signage
+// Medical domain palette: same in both themes — these are data colors, not chrome
 const MEDICAL_PALETTE = [
-	"#c0392b", // Rojo eritrocito — caso principal
-	"#d68910", // Ámbar INEN — datos institucionales
-	"#2e86c1", // Azul radiografía — datos comparativos
-	"#1e8449", // Verde ECG — tendencia positiva
-	"#7d3c98", // Violeta oncológico — datos específicos
-	"#b7950b", // Dorado cultivo — subgrupos
-	"#1a5276", // Azul profundo — fondo quirúrgico
-	"#922b21", // Carmín — valores críticos
+	"#c0392b",
+	"#d68910",
+	"#2e86c1",
+	"#1e8449",
+	"#7d3c98",
+	"#b7950b",
+	"#1a5276",
+	"#922b21",
 ];
 
-const tooltipStyle = {
-	backgroundColor: "#111118",
-	border: "1px solid rgba(255,255,255,0.08)",
-	borderRadius: "6px",
-	color: "#e8e4da",
-	fontSize: "12px",
-	padding: "8px 12px",
-	fontFamily: '"Courier New", monospace',
-	letterSpacing: "0.03em",
-	boxShadow: "0 4px 24px rgba(0,0,0,0.6)",
-};
+function useChartTokens(resolvedTheme: string | undefined) {
+	const dark = resolvedTheme === "dark";
+	return {
+		chartBg:       dark ? "#161b22" : "#f8f9fa",
+		chartBorder:   dark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.08)",
+		titleColor:    dark ? "#c8c4ba" : "#1a1a2e",
+		axisColor:     dark ? "#7d8590" : "#6b7280",
+		gridStroke:    dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.07)",
+		axisLineStroke:dark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.12)",
+		tooltipBg:     dark ? "#0d1117" : "#ffffff",
+		tooltipBorder: dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
+		tooltipText:   dark ? "#e6edf3" : "#1a1a2e",
+		tooltipLabel:  dark ? "#7d8590" : "#6b7280",
+		legendText:    dark ? "#7d8590" : "#6b7280",
+		accentStroke:  "#e84c3d",
+		dotBg:         dark ? "#161b22" : "#ffffff",
+	};
+}
 
-const axisStyle = {
-	fill: "#444",
-	fontSize: 11,
-	fontFamily: '"Courier New", monospace',
-};
-
-const gridStroke = "rgba(255,255,255,0.04)";
-
-// Wrapper that gives the chart its clinical container appearance
 function ChartShell({
 	titulo,
 	children,
+	tokens,
 }: {
 	titulo: string;
 	children: React.ReactNode;
+	tokens: ReturnType<typeof useChartTokens>;
 }) {
 	return (
 		<div
 			style={{
-				// Elevation 3: slightly brighter than message bubble (elevation 2)
-				background: "#111118",
-				border: "1px solid rgba(255,255,255,0.07)",
+				background: tokens.chartBg,
+				border: `1px solid ${tokens.chartBorder}`,
 				borderRadius: "10px",
 				padding: "20px 16px 16px",
 				marginTop: "12px",
@@ -86,7 +85,6 @@ function ChartShell({
 				overflow: "hidden",
 			}}
 		>
-			{/* Signature accent: left edge colored strip — like ECG paper has colored borders */}
 			<div
 				aria-hidden="true"
 				style={{
@@ -99,15 +97,13 @@ function ChartShell({
 					borderRadius: "2px 0 0 2px",
 				}}
 			/>
-
-			{/* Chart title: monospace label like a diagnostic report header */}
 			<div style={{ marginBottom: "16px", paddingLeft: "4px" }}>
 				<p
 					style={{
 						fontFamily: "Georgia, serif",
 						fontSize: "13px",
 						fontWeight: 600,
-						color: "#c8c4ba",
+						color: tokens.titleColor,
 						lineHeight: 1.3,
 						letterSpacing: "0.01em",
 					}}
@@ -115,98 +111,90 @@ function ChartShell({
 					{titulo}
 				</p>
 			</div>
-
 			{children}
 		</div>
 	);
 }
 
-// Custom tooltip label formatter
-function TooltipLabel({ label }: { label: string }) {
-	return (
-		<span
-			style={{
-				color: "#888",
-				display: "block",
-				marginBottom: "2px",
-				fontSize: "10px",
-			}}
-		>
-			{label}
-		</span>
-	);
-}
-void TooltipLabel; // suppress unused warning
-
 export default function ChartRenderer({ grafica }: Props) {
+	const { resolvedTheme } = useTheme();
+	const t = useChartTokens(resolvedTheme);
+
 	if (!grafica?.tipo || !grafica.datos || grafica.datos.length === 0) {
 		return null;
 	}
 
 	const { tipo, titulo, datos, ejeX, ejeY } = grafica;
 
+	const tooltipStyle = {
+		backgroundColor: t.tooltipBg,
+		border: `1px solid ${t.tooltipBorder}`,
+		borderRadius: "6px",
+		color: t.tooltipText,
+		fontSize: "12px",
+		padding: "8px 12px",
+		fontFamily: '"Courier New", monospace',
+		letterSpacing: "0.03em",
+		boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
+	};
+
+	const axisStyle = {
+		fill: t.axisColor,
+		fontSize: 11,
+		fontFamily: '"Courier New", monospace',
+	};
+
+	const axisLabelStyle = {
+		fill: t.axisColor,
+		fontSize: 10,
+		fontFamily: '"Courier New", monospace',
+		letterSpacing: "0.06em" as const,
+	};
+
+	const commonAxisProps = {
+		tick: axisStyle,
+		tickLine: false as const,
+	};
+
+	const xAxisLabel = {
+		value: ejeX,
+		position: "insideBottom" as const,
+		offset: -24,
+		...axisLabelStyle,
+	};
+
+	const yAxisLabel = {
+		value: ejeY,
+		angle: -90 as const,
+		position: "insideLeft" as const,
+		offset: 16,
+		...axisLabelStyle,
+	};
+
 	if (tipo === "bar") {
 		return (
-			<ChartShell titulo={titulo}>
+			<ChartShell titulo={titulo} tokens={t}>
 				<ResponsiveContainer width="100%" height={280}>
-					<BarChart
-						data={datos}
-						margin={{ top: 4, right: 12, left: -8, bottom: 36 }}
-					>
-						<CartesianGrid
-							strokeDasharray="2 4"
-							stroke={gridStroke}
-							vertical={false}
-						/>
+					<BarChart data={datos} margin={{ top: 4, right: 12, left: -8, bottom: 36 }}>
+						<CartesianGrid strokeDasharray="2 4" stroke={t.gridStroke} vertical={false} />
 						<XAxis
 							dataKey="nombre"
-							tick={axisStyle}
-							axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
-							tickLine={false}
-							label={{
-								value: ejeX,
-								position: "insideBottom",
-								offset: -24,
-								fill: "#333",
-								fontSize: 10,
-								fontFamily: '"Courier New", monospace',
-								letterSpacing: "0.06em",
-							}}
+							{...commonAxisProps}
+							axisLine={{ stroke: t.axisLineStroke }}
+							label={xAxisLabel}
 						/>
 						<YAxis
-							tick={axisStyle}
+							{...commonAxisProps}
 							axisLine={false}
-							tickLine={false}
-							label={{
-								value: ejeY,
-								angle: -90,
-								position: "insideLeft",
-								offset: 16,
-								fill: "#333",
-								fontSize: 10,
-								fontFamily: '"Courier New", monospace',
-								letterSpacing: "0.06em",
-							}}
+							label={yAxisLabel}
 						/>
 						<Tooltip
 							contentStyle={tooltipStyle}
-							cursor={{ fill: "rgba(232,76,61,0.04)" }}
-							labelStyle={{
-								color: "#666",
-								fontFamily: '"Courier New", monospace',
-								fontSize: "11px",
-								marginBottom: "4px",
-							}}
-							itemStyle={{ color: "#e8e4da" }}
+							cursor={{ fill: "rgba(232,76,61,0.06)" }}
+							labelStyle={{ color: t.tooltipLabel, fontFamily: '"Courier New", monospace', fontSize: "11px", marginBottom: "4px" }}
+							itemStyle={{ color: t.tooltipText }}
 						/>
-						<Bar
-							dataKey="valor"
-							fill="#c0392b"
-							radius={[3, 3, 0, 0]}
-							maxBarSize={48}
-							// Slight opacity variation for depth without multi-color noise
-							opacity={0.9}
-						/>
+						<Bar dataKey="valor" fill="#c0392b" radius={[3, 3, 0, 0]} maxBarSize={48} opacity={0.9} />
 					</BarChart>
 				</ResponsiveContainer>
 			</ChartShell>
@@ -215,69 +203,30 @@ export default function ChartRenderer({ grafica }: Props) {
 
 	if (tipo === "line") {
 		return (
-			<ChartShell titulo={titulo}>
+			<ChartShell titulo={titulo} tokens={t}>
 				<ResponsiveContainer width="100%" height={280}>
-					<LineChart
-						data={datos}
-						margin={{ top: 4, right: 12, left: -8, bottom: 36 }}
-					>
-						<CartesianGrid
-							strokeDasharray="2 4"
-							stroke={gridStroke}
-							vertical={false}
-						/>
+					<LineChart data={datos} margin={{ top: 4, right: 12, left: -8, bottom: 36 }}>
+						<CartesianGrid strokeDasharray="2 4" stroke={t.gridStroke} vertical={false} />
 						<XAxis
 							dataKey="nombre"
-							tick={axisStyle}
-							axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
-							tickLine={false}
-							label={{
-								value: ejeX,
-								position: "insideBottom",
-								offset: -24,
-								fill: "#333",
-								fontSize: 10,
-								fontFamily: '"Courier New", monospace',
-							}}
+							{...commonAxisProps}
+							axisLine={{ stroke: t.axisLineStroke }}
+							label={xAxisLabel}
 						/>
-						<YAxis
-							tick={axisStyle}
-							axisLine={false}
-							tickLine={false}
-							label={{
-								value: ejeY,
-								angle: -90,
-								position: "insideLeft",
-								offset: 16,
-								fill: "#333",
-								fontSize: 10,
-								fontFamily: '"Courier New", monospace',
-							}}
-						/>
+						<YAxis {...commonAxisProps} axisLine={false} label={yAxisLabel} />
 						<Tooltip
 							contentStyle={tooltipStyle}
 							cursor={{ stroke: "rgba(232,76,61,0.2)", strokeWidth: 1 }}
-							labelStyle={{
-								color: "#666",
-								fontFamily: '"Courier New", monospace',
-								fontSize: "11px",
-								marginBottom: "4px",
-							}}
-							itemStyle={{ color: "#e8e4da" }}
+							labelStyle={{ color: t.tooltipLabel, fontFamily: '"Courier New", monospace', fontSize: "11px", marginBottom: "4px" }}
+							itemStyle={{ color: t.tooltipText }}
 						/>
-						{/* Two-tone line: main stroke + highlight — signature ECG aesthetic */}
 						<Line
 							type="monotone"
 							dataKey="valor"
-							stroke="#e84c3d"
+							stroke={t.accentStroke}
 							strokeWidth={2}
-							dot={{ fill: "#111118", stroke: "#e84c3d", strokeWidth: 2, r: 3 }}
-							activeDot={{
-								r: 5,
-								fill: "#e84c3d",
-								stroke: "#0a0a0f",
-								strokeWidth: 2,
-							}}
+							dot={{ fill: t.dotBg, stroke: t.accentStroke, strokeWidth: 2, r: 3 }}
+							activeDot={{ r: 5, fill: t.accentStroke, stroke: t.dotBg, strokeWidth: 2 }}
 						/>
 					</LineChart>
 				</ResponsiveContainer>
@@ -287,77 +236,38 @@ export default function ChartRenderer({ grafica }: Props) {
 
 	if (tipo === "area") {
 		return (
-			<ChartShell titulo={titulo}>
+			<ChartShell titulo={titulo} tokens={t}>
 				<ResponsiveContainer width="100%" height={280}>
-					<AreaChart
-						data={datos}
-						margin={{ top: 4, right: 12, left: -8, bottom: 36 }}
-					>
+					<AreaChart data={datos} margin={{ top: 4, right: 12, left: -8, bottom: 36 }}>
 						<defs>
-							{/* Gradient: visible top, fades out — like ECG amplitude visualization */}
 							<linearGradient id="onco-area-grad" x1="0" y1="0" x2="0" y2="1">
 								<stop offset="0%" stopColor="#e84c3d" stopOpacity={0.22} />
 								<stop offset="75%" stopColor="#e84c3d" stopOpacity={0.03} />
 								<stop offset="100%" stopColor="#e84c3d" stopOpacity={0} />
 							</linearGradient>
 						</defs>
-						<CartesianGrid
-							strokeDasharray="2 4"
-							stroke={gridStroke}
-							vertical={false}
-						/>
+						<CartesianGrid strokeDasharray="2 4" stroke={t.gridStroke} vertical={false} />
 						<XAxis
 							dataKey="nombre"
-							tick={axisStyle}
-							axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
-							tickLine={false}
-							label={{
-								value: ejeX,
-								position: "insideBottom",
-								offset: -24,
-								fill: "#333",
-								fontSize: 10,
-								fontFamily: '"Courier New", monospace',
-							}}
+							{...commonAxisProps}
+							axisLine={{ stroke: t.axisLineStroke }}
+							label={xAxisLabel}
 						/>
-						<YAxis
-							tick={axisStyle}
-							axisLine={false}
-							tickLine={false}
-							label={{
-								value: ejeY,
-								angle: -90,
-								position: "insideLeft",
-								offset: 16,
-								fill: "#333",
-								fontSize: 10,
-								fontFamily: '"Courier New", monospace',
-							}}
-						/>
+						<YAxis {...commonAxisProps} axisLine={false} label={yAxisLabel} />
 						<Tooltip
 							contentStyle={tooltipStyle}
 							cursor={{ stroke: "rgba(232,76,61,0.2)", strokeWidth: 1 }}
-							labelStyle={{
-								color: "#666",
-								fontFamily: '"Courier New", monospace',
-								fontSize: "11px",
-								marginBottom: "4px",
-							}}
-							itemStyle={{ color: "#e8e4da" }}
+							labelStyle={{ color: t.tooltipLabel, fontFamily: '"Courier New", monospace', fontSize: "11px", marginBottom: "4px" }}
+							itemStyle={{ color: t.tooltipText }}
 						/>
 						<Area
 							type="monotone"
 							dataKey="valor"
-							stroke="#e84c3d"
+							stroke={t.accentStroke}
 							strokeWidth={2}
 							fill="url(#onco-area-grad)"
 							dot={false}
-							activeDot={{
-								r: 4,
-								fill: "#e84c3d",
-								stroke: "#0a0a0f",
-								strokeWidth: 2,
-							}}
+							activeDot={{ r: 4, fill: t.accentStroke, stroke: t.dotBg, strokeWidth: 2 }}
 						/>
 					</AreaChart>
 				</ResponsiveContainer>
@@ -367,7 +277,7 @@ export default function ChartRenderer({ grafica }: Props) {
 
 	if (tipo === "pie") {
 		return (
-			<ChartShell titulo={titulo}>
+			<ChartShell titulo={titulo} tokens={t}>
 				<ResponsiveContainer width="100%" height={280}>
 					<PieChart>
 						<Pie
@@ -378,48 +288,30 @@ export default function ChartRenderer({ grafica }: Props) {
 							cy="48%"
 							outerRadius={95}
 							innerRadius={38}
-							// Donut: WHY — donut form avoids the "pie = percentage slice" misleading
-							// visual; more appropriate for absolute count data in clinical contexts
 							paddingAngle={2}
 							label={({ name, percent }: { name?: string; percent?: number }) =>
 								`${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`
 							}
-							labelLine={{ stroke: "rgba(255,255,255,0.15)", strokeWidth: 1 }}
+							labelLine={{ stroke: t.axisColor, strokeWidth: 1 }}
 						>
 							{datos.map((_, index) => (
 								<Cell
 									key={`cell-${index}`}
 									fill={MEDICAL_PALETTE[index % MEDICAL_PALETTE.length]}
-									stroke="rgba(10,10,15,0.4)"
-									strokeWidth={1}
+									stroke={t.chartBg}
+									strokeWidth={2}
 								/>
 							))}
 						</Pie>
 						<Tooltip
 							contentStyle={tooltipStyle}
-							itemStyle={{
-								color: "#e8e4da",
-								fontFamily: '"Courier New", monospace',
-							}}
+							itemStyle={{ color: t.tooltipText, fontFamily: '"Courier New", monospace' }}
 						/>
 					</PieChart>
 				</ResponsiveContainer>
-
-				{/* Legend: custom, not Recharts default — cleaner, no crowding */}
-				<div
-					style={{
-						display: "flex",
-						flexWrap: "wrap",
-						gap: "8px 16px",
-						paddingTop: "4px",
-						paddingLeft: "4px",
-					}}
-				>
+				<div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", paddingTop: "4px", paddingLeft: "4px" }}>
 					{datos.map((d, i) => (
-						<div
-							key={i}
-							style={{ display: "flex", alignItems: "center", gap: "6px" }}
-						>
+						<div key={i} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
 							<span
 								style={{
 									width: "8px",
@@ -433,7 +325,7 @@ export default function ChartRenderer({ grafica }: Props) {
 							<span
 								style={{
 									fontSize: "11px",
-									color: "#666",
+									color: t.legendText,
 									fontFamily: '"Courier New", monospace',
 									letterSpacing: "0.03em",
 								}}
