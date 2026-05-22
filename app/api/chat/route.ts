@@ -1,4 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+
 import { callAI } from "@/lib/ai";
 import { detectFilters, retrieveContext } from "@/lib/retrieval";
 import {
