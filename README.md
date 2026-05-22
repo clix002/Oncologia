@@ -41,7 +41,7 @@ flowchart TD
         OLTP[("PostgreSQL OLTP\npuerto 5433")]
         OLAP[("PostgreSQL OLAP\npuerto 5434")]
         MONGO[("MongoDB\npuerto 27018")]
-        NEO[(("Neo4j\npuerto 7688"))]
+        NEO[("Neo4j\npuerto 7688")]
     end
 
     subgraph DEV["bun run dev"]
@@ -179,12 +179,35 @@ erDiagram
         int dim_fuente_id FK
         int casos
     }
-    dim_tiempo { int id; int año; int mes }
-    dim_geografia { int id; varchar departamento; varchar provincia }
-    dim_paciente { int id; char sexo; varchar grupo_edad }
-    dim_diagnostico { int id; varchar cod_cie10; varchar descripcion; varchar grupo }
-    dim_establecimiento { int id; varchar nombre }
-    dim_fuente { int id; varchar nombre }
+    dim_tiempo {
+        int id
+        int anio
+        int mes
+    }
+    dim_geografia {
+        int id
+        varchar departamento
+        varchar provincia
+    }
+    dim_paciente {
+        int id
+        char sexo
+        varchar grupo_edad
+    }
+    dim_diagnostico {
+        int id
+        varchar cod_cie10
+        varchar descripcion
+        varchar grupo
+    }
+    dim_establecimiento {
+        int id
+        varchar nombre
+    }
+    dim_fuente {
+        int id
+        varchar nombre
+    }
 
     fact_oncologia }o--|| dim_tiempo : ""
     fact_oncologia }o--|| dim_geografia : ""
