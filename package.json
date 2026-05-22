@@ -23,7 +23,6 @@
     "turbo": "turbo"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@libsql/client": "^0.17.2",
     "arquero": "^8.0.3",
     "better-sqlite3": "^12.8.0",

@@ -142,7 +142,7 @@ const TECH_STACK = [
     items: [
       { name: "Podman", version: "5.8", desc: "5 contenedores · compose" },
       { name: "Fedora", version: "44", desc: "Sistema operativo host" },
-      { name: "Gemini API", version: "—", desc: "Chat IA principal · fallback Ollama" },
+      { name: "Ollama", version: "latest", desc: "gemma3:1b · nomic-embed-text · LLM local" },
     ],
   },
 ];
@@ -462,7 +462,7 @@ export default function DataCatalogPage() {
                         {
                           step: "06",
                           label: "Visualización",
-                          tech: "Next.js 16 · Recharts · shadcn/ui · Gemini/Ollama Chat",
+                          tech: "Next.js 16 · Recharts · shadcn/ui · Ollama Chat",
                           detail: "Dashboard interactivo · 6 pestañas · mapa del Perú · chat IA con contexto clínico",
                           icon: Server,
                           color: "text-orange-400 bg-orange-500/10 border-orange-500/20",
