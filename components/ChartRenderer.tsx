@@ -49,19 +49,19 @@ const MEDICAL_PALETTE = [
 function useChartTokens(resolvedTheme: string | undefined) {
 	const dark = resolvedTheme === "dark";
 	return {
-		chartBg:       dark ? "#161b22" : "#f8f9fa",
-		chartBorder:   dark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.08)",
-		titleColor:    dark ? "#c8c4ba" : "#1a1a2e",
-		axisColor:     dark ? "#7d8590" : "#6b7280",
-		gridStroke:    dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.07)",
-		axisLineStroke:dark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.12)",
-		tooltipBg:     dark ? "#0d1117" : "#ffffff",
-		tooltipBorder: dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
-		tooltipText:   dark ? "#e6edf3" : "#1a1a2e",
-		tooltipLabel:  dark ? "#7d8590" : "#6b7280",
-		legendText:    dark ? "#7d8590" : "#6b7280",
-		accentStroke:  "#e84c3d",
-		dotBg:         dark ? "#161b22" : "#ffffff",
+		chartBg:        dark ? "#161b22" : "#f8f9fa",
+		chartBorder:    dark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.08)",
+		titleColor:     dark ? "#c8c4ba" : "#1a1a2e",
+		axisColor:      dark ? "#7d8590" : "#6b7280",
+		gridStroke:     dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.07)",
+		axisLineStroke: dark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.12)",
+		tooltipBg:      dark ? "#0d1117" : "#ffffff",
+		tooltipBorder:  dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
+		tooltipText:    dark ? "#e6edf3" : "#1a1a2e",
+		tooltipLabel:   dark ? "#7d8590" : "#6b7280",
+		legendText:     dark ? "#7d8590" : "#6b7280",
+		accentStroke:   "#e84c3d",
+		dotBg:          dark ? "#161b22" : "#ffffff",
 	};
 }
 
@@ -83,7 +83,7 @@ function ChartShell({
 				padding: "20px 16px 16px",
 				marginTop: "12px",
 				position: "relative",
-				overflow: "hidden",
+				overflow: "visible",
 			}}
 		>
 			<div
@@ -92,10 +92,11 @@ function ChartShell({
 					position: "absolute",
 					left: 0,
 					top: 0,
-					bottom: 0,
+					height: "100%",
 					width: "2px",
 					background: "linear-gradient(180deg, #e84c3d 0%, transparent 100%)",
 					borderRadius: "2px 0 0 2px",
+					pointerEvents: "none",
 				}}
 			/>
 			<div style={{ marginBottom: "16px", paddingLeft: "4px" }}>
@@ -122,7 +123,6 @@ export default function ChartRenderer({ grafica }: Props) {
 	const [mounted, setMounted] = useState(false);
 	useEffect(() => setMounted(true), []);
 
-	// Wait for client hydration so resolvedTheme is accurate
 	const t = useChartTokens(mounted ? resolvedTheme : "dark");
 
 	if (!grafica?.tipo || !grafica.datos || grafica.datos.length === 0) {
@@ -188,11 +188,7 @@ export default function ChartRenderer({ grafica }: Props) {
 							axisLine={{ stroke: t.axisLineStroke }}
 							label={xAxisLabel}
 						/>
-						<YAxis
-							{...commonAxisProps}
-							axisLine={false}
-							label={yAxisLabel}
-						/>
+						<YAxis {...commonAxisProps} axisLine={false} label={yAxisLabel} />
 						<Tooltip
 							contentStyle={tooltipStyle}
 							cursor={{ fill: "rgba(232,76,61,0.06)" }}
@@ -283,37 +279,39 @@ export default function ChartRenderer({ grafica }: Props) {
 	if (tipo === "pie") {
 		return (
 			<ChartShell titulo={titulo} tokens={t}>
-				<ResponsiveContainer width="100%" height={280}>
-					<PieChart>
-						<Pie
-							data={datos}
-							dataKey="valor"
-							nameKey="nombre"
-							cx="50%"
-							cy="48%"
-							outerRadius={95}
-							innerRadius={38}
-							paddingAngle={2}
-							label={({ name, percent }: { name?: string; percent?: number }) =>
-								`${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`
-							}
-							labelLine={{ stroke: t.axisColor, strokeWidth: 1 }}
-						>
-							{datos.map((_, index) => (
-								<Cell
-									key={`cell-${index}`}
-									fill={MEDICAL_PALETTE[index % MEDICAL_PALETTE.length]}
-									stroke={t.chartBg}
-									strokeWidth={2}
-								/>
-							))}
-						</Pie>
-						<Tooltip
-							contentStyle={tooltipStyle}
-							itemStyle={{ color: t.tooltipText, fontFamily: '"Courier New", monospace' }}
-						/>
-					</PieChart>
-				</ResponsiveContainer>
+				<div style={{ width: "100%", height: 280, minHeight: 280 }}>
+					<ResponsiveContainer width="100%" height={280}>
+						<PieChart>
+							<Pie
+								data={datos}
+								dataKey="valor"
+								nameKey="nombre"
+								cx="50%"
+								cy="48%"
+								outerRadius={95}
+								innerRadius={38}
+								paddingAngle={2}
+								label={({ name, percent }: { name?: string; percent?: number }) =>
+									`${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`
+								}
+								labelLine={{ stroke: t.axisColor, strokeWidth: 1 }}
+							>
+								{datos.map((_, index) => (
+									<Cell
+										key={`cell-${index}`}
+										fill={MEDICAL_PALETTE[index % MEDICAL_PALETTE.length]}
+										stroke={t.chartBg}
+										strokeWidth={2}
+									/>
+								))}
+							</Pie>
+							<Tooltip
+								contentStyle={tooltipStyle}
+								itemStyle={{ color: t.tooltipText, fontFamily: '"Courier New", monospace' }}
+							/>
+						</PieChart>
+					</ResponsiveContainer>
+				</div>
 				<div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", paddingTop: "4px", paddingLeft: "4px" }}>
 					{datos.map((d, i) => (
 						<div key={i} style={{ display: "flex", alignItems: "center", gap: "6px" }}>

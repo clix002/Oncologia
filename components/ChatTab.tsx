@@ -6,6 +6,67 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ChartRenderer from "./ChartRenderer";
 
+/** Renders a markdown string as simple HTML (bold, italic, inline code, lists). */
+function MarkdownText({ text }: { text: string }) {
+	const lines = text.split("\n");
+	const elements: React.ReactNode[] = [];
+
+	const parseInline = (line: string, key: string): React.ReactNode => {
+		// Split on **bold**, *italic*, `code`
+		const parts = line.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
+		return (
+			<span key={key}>
+				{parts.map((part, i) => {
+					if (part.startsWith("**") && part.endsWith("**"))
+						return <strong key={i}>{part.slice(2, -2)}</strong>;
+					if (part.startsWith("*") && part.endsWith("*"))
+						return <em key={i}>{part.slice(1, -1)}</em>;
+					if (part.startsWith("`") && part.endsWith("`"))
+						return (
+							<code key={i} className="bg-muted px-1 rounded text-xs font-mono">
+								{part.slice(1, -1)}
+							</code>
+						);
+					return part;
+				})}
+			</span>
+		);
+	};
+
+	let i = 0;
+	while (i < lines.length) {
+		const line = lines[i];
+		if (/^#{1,3}\s/.test(line)) {
+			elements.push(
+				<p key={i} className="font-semibold mt-1">
+					{parseInline(line.replace(/^#{1,3}\s/, ""), `h-${i}`)}
+				</p>,
+			);
+		} else if (/^[-*]\s/.test(line)) {
+			const listItems: React.ReactNode[] = [];
+			while (i < lines.length && /^[-*]\s/.test(lines[i])) {
+				listItems.push(
+					<li key={i}>{parseInline(lines[i].replace(/^[-*]\s/, ""), `li-${i}`)}</li>,
+				);
+				i++;
+			}
+			elements.push(
+				<ul key={`ul-${i}`} className="list-disc list-inside space-y-0.5 my-1">
+					{listItems}
+				</ul>,
+			);
+			continue;
+		} else if (line.trim() === "") {
+			elements.push(<br key={i} />);
+		} else {
+			elements.push(<p key={i}>{parseInline(line, `p-${i}`)}</p>);
+		}
+		i++;
+	}
+
+	return <div className="space-y-0.5">{elements}</div>;
+}
+
 interface Message {
 	role: "user" | "assistant";
 	text: string;
@@ -111,7 +172,7 @@ export default function ChatTab({ region }: ChatTabProps) {
 										: "bg-secondary text-foreground"
 								}`}
 							>
-								<p>{m.text}</p>
+								<MarkdownText text={m.text} />
 								{m.grafica && (
 									<div className="mt-3">
 										<ChartRenderer grafica={m.grafica} />

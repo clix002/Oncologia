@@ -5,7 +5,6 @@
     "": {
       "name": "ayacucho-onco-bi",
       "dependencies": {
-        "@google/generative-ai": "^0.24.1",
         "@libsql/client": "^0.17.2",
         "arquero": "^8.0.3",
         "better-sqlite3": "^12.8.0",
@@ -47,19 +46,11 @@
       "name": "@oncologia/etl",
       "version": "0.1.0",
       "dependencies": {
-        "@oncologia/types": "workspace:*",
         "mongodb": "^7.2.0",
         "neo4j-driver": "^6.0.1",
         "papaparse": "^5.5.3",
         "postgres": "^3.4.9",
         "xlsx": "^0.18.5",
-      },
-    },
-    "packages/types": {
-      "name": "@oncologia/types",
-      "version": "0.1.0",
-      "devDependencies": {
-        "typescript": "^5",
       },
     },
   },
@@ -224,8 +215,6 @@
 
     "@floating-ui/utils": ["@floating-ui/utils@0.2.11", "", {}, "sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg=="],
 
-    "@google/generative-ai": ["@google/generative-ai@0.24.1", "", {}, "sha512-MqO+MLfM6kjxcKoy0p1wRzG3b4ZZXtPI+z2IE26UogS2Cm/XHO+7gGRBh6gcJsOiIVoH93UwKvW4HdgiOZCy9Q=="],
-
     "@hono/node-server": ["@hono/node-server@1.19.11", "", { "peerDependencies": { "hono": "^4" } }, "sha512-dr8/3zEaB+p0D2n/IUrlPF1HZm586qgJNXK1a9fhg/PzdtkK7Ksd5l312tJX2yBuALqDYBlG20QEbayqPyxn+g=="],
 
     "@humanfs/core": ["@humanfs/core@0.19.1", "", {}, "sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA=="],
@@ -377,8 +366,6 @@
     "@nolyfill/is-core-module": ["@nolyfill/is-core-module@1.0.39", "", {}, "sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA=="],
 
     "@oncologia/etl": ["@oncologia/etl@workspace:apps/etl"],
-
-    "@oncologia/types": ["@oncologia/types@workspace:packages/types"],
 
     "@open-draft/deferred-promise": ["@open-draft/deferred-promise@2.2.0", "", {}, "sha512-CecwLWx3rhxVQF6V4bAgPS5t+So2sTbPgAzafKkVizyi7tlwpcFpdFqq+wqF2OwNBmqFuu6tOyouTuxgpMfzmA=="],
 

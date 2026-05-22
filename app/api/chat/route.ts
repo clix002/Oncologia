@@ -1,7 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { callAI } from "@/lib/ai";
 import { detectFilters, retrieveContext } from "@/lib/retrieval";
-import { getRankingDepartamentos, resumenDepartamento } from "@/lib/stats";
+import {
+  getRankingDepartamentos,
+  resumenDepartamento,
+  getDistribucionSexo,
+  getCasosPorDeptoAnio,
+  getProvincias,
+  getTendenciaMensual,
+} from "@/lib/stats";
 
 const SYSTEM_PROMPT_TEMPLATE = `Eres un analista de inteligencia de negocios especializado en salud pública en Perú.
 Analizas datos de casos oncológicos nuevos registrados en el INEN para [SCOPE_DESC] (2022-2025).
@@ -43,6 +50,101 @@ interface ChatRequestBody {
 	message: string;
 	history?: HistoryEntry[];
 	region?: string;
+}
+
+/** Detect intent from question text */
+function detectIntent(q: string) {
+	const lower = q.toLowerCase();
+	const isSexo = /sexo|hombres?|mujeres?|masculin|femenin|género|genero|compara/.test(lower);
+	const isTendencia = /tendencia|mensual|mes|evolución|evolucion|tiempo/.test(lower);
+	const isProvincias = /provincia|distrito|ciudad|zona/.test(lower);
+	const isRanking = /ranking|más casos|mayor|top|peor|mejor|departamento/.test(lower);
+	const isAnio = /\b(202[0-9]|año|anual|por año)\b/.test(lower);
+	return { isSexo, isTendencia, isProvincias, isRanking, isAnio };
+}
+
+/** Build chart data directly from SQL — reliable, no LLM needed */
+async function buildChartFromSQL(
+	intent: ReturnType<typeof detectIntent>,
+	filters: { departamento?: string; año?: number },
+): Promise<object | null> {
+	try {
+		if (intent.isSexo) {
+			const rows = await getDistribucionSexo(filters.departamento, filters.año);
+			if (rows.length === 0) return null;
+			return {
+				tipo: "pie",
+				titulo: `Distribución por sexo${filters.departamento ? ` — ${filters.departamento}` : ""}`,
+				datos: rows.map((r) => ({ nombre: r.sexo === "F" ? "Mujer" : r.sexo === "M" ? "Hombre" : r.sexo, valor: r.casos })),
+				ejeX: "Sexo",
+				ejeY: "Casos",
+			};
+		}
+
+		if (intent.isTendencia && filters.departamento) {
+			const año = filters.año ?? new Date().getFullYear() - 1;
+			const meses = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+			// Try monthly first; fall back to annual if insufficient data
+			const monthly = await getTendenciaMensual(filters.departamento, año);
+			if (monthly.length >= 3) {
+				return {
+					tipo: "line",
+					titulo: `Tendencia mensual ${año} — ${filters.departamento}`,
+					datos: monthly.map((r) => ({ nombre: meses[r.mes - 1] ?? String(r.mes), valor: r.casos })),
+					ejeX: "Mes",
+					ejeY: "Casos",
+				};
+			}
+			// Fallback: annual trend
+			const annual = await getCasosPorDeptoAnio(filters.departamento);
+			if (annual.length === 0) return null;
+			return {
+				tipo: "area",
+				titulo: `Tendencia anual — ${filters.departamento}`,
+				datos: annual.map((r) => ({ nombre: String(r.año), valor: r.casos })),
+				ejeX: "Año",
+				ejeY: "Casos",
+			};
+		}
+
+		if (intent.isProvincias && filters.departamento) {
+			const rows = await getProvincias(filters.departamento, filters.año);
+			if (rows.length === 0) return null;
+			return {
+				tipo: "bar",
+				titulo: `Casos por provincia — ${filters.departamento}`,
+				datos: rows.slice(0, 10).map((r) => ({ nombre: r.provincia, valor: r.casos })),
+				ejeX: "Provincia",
+				ejeY: "Casos",
+			};
+		}
+
+		if (filters.departamento) {
+			// Default for a region: cases by year
+			const rows = await getCasosPorDeptoAnio(filters.departamento, filters.año);
+			if (rows.length === 0) return null;
+			return {
+				tipo: "area",
+				titulo: `Casos por año — ${filters.departamento}`,
+				datos: rows.map((r) => ({ nombre: String(r.año), valor: r.casos })),
+				ejeX: "Año",
+				ejeY: "Casos",
+			};
+		}
+
+		// National ranking
+		const rows = await getRankingDepartamentos(filters.año);
+		if (rows.length === 0) return null;
+		return {
+			tipo: "bar",
+			titulo: `Top departamentos${filters.año ? ` (${filters.año})` : ""}`,
+			datos: rows.slice(0, 10).map((r) => ({ nombre: r.departamento, valor: r.casos })),
+			ejeX: "Departamento",
+			ejeY: "Casos",
+		};
+	} catch {
+		return null;
+	}
 }
 
 export async function POST(request: NextRequest) {
@@ -111,6 +213,20 @@ export async function POST(request: NextRequest) {
 
 		// 5. Llamar LLM
 		const result = await callAI(systemPrompt, query, history);
+
+		// 6. Build chart from SQL — always do it for chart-triggering intents;
+		//    use LLM chart only if it has actual data points.
+		const intent = detectIntent(query);
+		const wantsChart = intent.isSexo || intent.isTendencia || intent.isProvincias || intent.isRanking || intent.isAnio
+			|| /gr[áa]fica|gr[áa]fico|gr[áa]fic|chart|visual|mostr|dibuj/.test(query.toLowerCase());
+
+		const llmGrafica = result.grafica as any;
+		const llmHasData = Array.isArray(llmGrafica?.datos) && llmGrafica.datos.length > 0;
+
+		if (!llmHasData && wantsChart) {
+			const sqlChart = await buildChartFromSQL(intent, filters);
+			if (sqlChart) result.grafica = sqlChart;
+		}
 
 		return NextResponse.json(result);
 	} catch (error) {
