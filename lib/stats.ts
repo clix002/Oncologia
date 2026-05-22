@@ -2,25 +2,10 @@
  * Módulo de análisis estadístico — PostgreSQL OLAP
  * Reescrito para la nueva arquitectura containerizada
  */
-import postgres from "postgres";
+import { getDb } from "@/lib/db";
 import * as ss from "simple-statistics";
 
-function getSql() {
-  return postgres({
-    host: process.env.POSTGRES_OLAP_HOST || "localhost",
-    port: Number(process.env.POSTGRES_OLAP_PORT) || 5434,
-    database: process.env.POSTGRES_OLAP_DB || "oncologia_olap",
-    username: process.env.POSTGRES_OLAP_USER || "oncologia",
-    password: process.env.POSTGRES_OLAP_PASSWORD || "oncologia_dev_2026",
-    max: 10,
-  });
-}
-
-let _sql: ReturnType<typeof getSql> | null = null;
-function sql() {
-  if (!_sql) _sql = getSql();
-  return _sql;
-}
+function sql() { return getDb(); }
 
 // ── Queries ──
 

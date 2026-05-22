@@ -8,39 +8,48 @@ interface HistoryEntry {
   content: string;
 }
 
-// ── Ollama (local) ──
+// ── Gemini ──
 
-async function callOllama(
+async function callGemini(
   systemPrompt: string,
   userMessage: string,
   history: HistoryEntry[],
 ): Promise<string> {
-  const host = process.env.OLLAMA_HOST || "http://localhost:11435";
-  const model = process.env.OLLAMA_MODEL || "gemma3:1b";
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY not set");
 
-  const messages = [
-    { role: "system", content: systemPrompt },
+  const contents = [
     ...history.map((e) => ({
-      role: e.role === "assistant" ? "assistant" : "user",
-      content: e.content,
+      role: e.role === "assistant" ? "model" : "user",
+      parts: [{ text: e.content }],
     })),
-    { role: "user", content: userMessage },
+    { role: "user", parts: [{ text: userMessage }] },
   ];
 
-  const response = await fetch(`${host}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, messages, stream: false }),
-  });
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents,
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 1024,
+        },
+      }),
+    },
+  );
 
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`Ollama error ${response.status}: ${err}`);
+    throw new Error(`Gemini error ${response.status}: ${err}`);
   }
 
   const data = await response.json();
-  const text: string = data?.message?.content ?? "";
-  if (!text) throw new Error("Ollama returned empty response");
+  const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  if (!text) throw new Error("Gemini returned empty response");
   return text;
 }
 
@@ -72,15 +81,15 @@ export async function callAI(
   history: HistoryEntry[],
 ): Promise<AIResponse> {
   try {
-    const raw = await callOllama(systemPrompt, userMessage, history);
+    const raw = await callGemini(systemPrompt, userMessage, history);
     return parseAIResponse(raw);
   } catch (err) {
-    console.warn("Ollama failed:", (err as Error).message);
+    console.warn("Gemini failed:", (err as Error).message);
   }
 
   return {
     texto:
-      "Lo siento, el modelo de IA no está disponible. Iniciá Ollama con: podman start oncologia-ollama",
+      "Lo siento, el modelo de IA no está disponible. Verificá que GEMINI_API_KEY esté configurada.",
     grafica: null,
   };
 }
